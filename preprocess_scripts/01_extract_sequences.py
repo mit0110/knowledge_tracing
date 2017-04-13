@@ -23,6 +23,8 @@ def parse_arguments():
                         help='The path to the file to replace in csv format.')
     parser.add_argument('--output_filename', type=str,
                         help='The path to store the sequences objects.')
+    parser.add_argument('--limit', type=int, default=0,
+                        help='Use only the first limit sequences. If 0, use all.')
     return parser.parse_args()
 
 
@@ -43,7 +45,10 @@ def main():
 
     # Separate the student sequences
     groups = df.groupby('user_id')
-    student_dfs = [groups.get_group(x) for x in groups.groups]
+    if args.limit is 0:
+        student_dfs = [groups.get_group(x) for x in groups.groups]
+    else:
+        student_dfs = [groups.get_group(x) for x in groups.groups][:args.limit]
     sequences = []
     labels = []
     for student_df in tqdm(student_dfs):
