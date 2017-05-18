@@ -1,9 +1,8 @@
 import argparse
-import numpy
 import utils
 
 from quick_experiment import dataset
-from quick_experiment.models import dkt
+from quick_experiment.models import lstm
 
 
 def parse_arguments():
@@ -22,25 +21,8 @@ class DKTDataset(dataset.LabeledSequenceDataset):
 
     def classes_num(self, _=None):
         """The number of problems in the dataset"""
-        return self.feature_vector_size
-
-    def _pad_batch(self, batch_instances, batch_labels,
-                   max_sequence_length=None):
-        lengths = self._get_sequence_lengths(batch_instances)
-        padded_batch = numpy.zeros((batch_instances.shape[0],
-                                    max_sequence_length,
-                                    self.feature_vector_size))
-        padded_labels = numpy.zeros(
-            (batch_instances.shape[0], max_sequence_length, 2))
-        for index, sequence in enumerate(batch_instances):
-            if lengths[index] <= max_sequence_length:
-                padded_batch[index, :lengths[index]] = sequence
-                padded_labels[index, :lengths[index]] = batch_labels[index]
-            else:
-                padded_batch[index] = sequence[-max_sequence_length:]
-                padded_labels[index] = batch_labels[
-                    index][-max_sequence_length:]
-        return padded_batch, padded_labels, lengths
+        assert self.feature_vector_size % 2 == 0
+        return (self.feature_vector_size / 2) + 1
 
 
 def main():
@@ -48,10 +30,8 @@ def main():
     assistment_dataset = DKTDataset()
     sequences, labels = utils.pickle_from_file(args.filename)
     partitions = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
-    assistment_dataset.create_samples(
-        numpy.array([x.tocsr() for x in sequences]),
-        numpy.array([numpy.array(zip(*x)) for x in labels]),
-        partition_sizes=partitions, samples_num=1)
+    assistment_dataset.create_samples(sequences, labels,
+                                      partition_sizes=partitions, samples_num=1)
 
     assistment_dataset.set_current_sample(0)
 
@@ -59,7 +39,7 @@ def main():
         'hidden_layer_size': 20, 'batch_size': 500, 'logs_dirname': None,
         'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 10
     }
-    model = dkt.DKTModel(assistment_dataset, **experiment_config)
+    model = lstm.SeqPredictionModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
 
 

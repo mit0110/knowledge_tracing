@@ -40,7 +40,7 @@ def main():
             current_max_skill += 1
         else:
             skill_id = skill_id_map[skills]
-        new_dataset.loc[order_id,['new_skill_id']] = skill_id
+        new_dataset.loc[order_id, ['new_skill_id']] = skill_id
     new_dataset.rename(columns={'skill_id': 'joined_skills'}, inplace=True)
 
     print 'Joining'
