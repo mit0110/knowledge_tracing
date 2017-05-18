@@ -1,4 +1,5 @@
 import argparse
+import pandas
 import utils
 
 from quick_experiment import dataset
@@ -12,6 +13,8 @@ def parse_arguments():
     parser.add_argument('--filename', type=str,
                         help='The path to the pickled file with the processed'
                              'sequences.')
+    parser.add_argument('--test_predictions_filename', type=str,
+                        help='The path to the file to store the predictions')
     return parser.parse_args()
 
 
@@ -44,6 +47,10 @@ def main():
     }
     model = lstm.SeqPredictionModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
+    predictions = pandas.DataFrame(model.predict('test'),
+                                   columns=['True', 'Predictions'])
+    predictions.to_csv(args.test_predictions_filename)
+
 
 
 if __name__ == '__main__':
