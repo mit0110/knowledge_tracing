@@ -7,6 +7,8 @@ from quick_experiment.models import lstm
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--logs_dirname', type=str, default=None,
+                        help='Path to directory to store tensorboard info')
     parser.add_argument('--filename', type=str,
                         help='The path to the pickled file with the processed'
                              'sequences.')
@@ -36,8 +38,9 @@ def main():
     assistment_dataset.set_current_sample(0)
 
     experiment_config = {
-        'hidden_layer_size': 20, 'batch_size': 500, 'logs_dirname': None,
-        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 10
+        'hidden_layer_size': 50, 'batch_size': 50,
+        'logs_dirname': args.logs_dirname,
+        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 50
     }
     model = lstm.SeqPredictionModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
