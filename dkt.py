@@ -1,5 +1,6 @@
 import argparse
 import pandas
+import dkt_model
 import utils
 
 from quick_experiment import dataset
@@ -45,10 +46,12 @@ def main():
         'logs_dirname': args.logs_dirname,
         'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 50
     }
-    model = lstm.SeqPredictionModel(assistment_dataset, **experiment_config)
+    model = dkt_model.DktLSTMModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
-    predictions = pandas.DataFrame(model.predict('test'),
-                                   columns=['True', 'Predictions'])
+    predictions = pandas.DataFrame()
+    true_labels, predicted_labels = model.predict('test')
+    predictions['True'] = true_labels
+    predictions['Predictions'] = predicted_labels
     predictions.to_csv(args.test_predictions_filename)
 
 
