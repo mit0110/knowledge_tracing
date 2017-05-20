@@ -1,5 +1,5 @@
 import argparse
-import pandas
+import os
 import dkt_model
 import utils
 
@@ -42,17 +42,16 @@ def main():
     assistment_dataset.set_current_sample(0)
 
     experiment_config = {
-        'hidden_layer_size': 50, 'batch_size': 50,
+        'hidden_layer_size': 200, 'batch_size': 50,
         'logs_dirname': args.logs_dirname,
-        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 50
+        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 100
     }
     model = dkt_model.DktLSTMModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
-    predictions = pandas.DataFrame()
-    true_labels, predicted_labels = model.predict('test')
-    predictions['True'] = true_labels
-    predictions['Predictions'] = predicted_labels
-    predictions.to_csv(args.test_predictions_filename)
+    predicted_labels = model.predict('test')
+    utils.pickle_to_file(
+        predicted_labels,
+        os.path.join(args.test_predictions_filename, 'predictions.p'))
 
 
 

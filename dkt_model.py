@@ -28,9 +28,9 @@ class DktLSTMModel(lstm.SeqPredictionModel):
         # value can only be 0 or 1.
         # We multiply the predictions by the labels placeholder to filter out
         # the predictions for exercises that are not the next one.
-        predictions = tf.reduce_max(
-            tf.multiply(predictions, self.labels_placeholder), axis=2,
-            name='predictions')
+        predictions = tf.reduce_max(tf.multiply(
+            predictions, tf.cast(self.labels_placeholder, predictions.dtype)),
+            axis=2, name='predictions')
         return predictions
 
     def _get_step_predictions(self, batch_prediction, batch_true, feed_dict):
@@ -76,7 +76,8 @@ class DktLSTMModel(lstm.SeqPredictionModel):
                 dtype=predictions.dtype)
             # We use the mask to ignore predictions outside the sequence length.
             r2, r2_update = tf.contrib.metrics.streaming_pearson_correlation(
-                predictions, tf.reduce_max(self.labels_placeholder, axis=2),
+                predictions, tf.cast(tf.reduce_max(
+                    self.labels_placeholder, axis=2), predictions.dtype),
                 weights=mask)
 
         return r2, r2_update
@@ -89,9 +90,9 @@ class DktLSTMModel(lstm.SeqPredictionModel):
         r2_op, r2_update_op = correct_predictions
         self.dataset.reset_batch()
         r2_value = None
+        self.sess.run([tf.variables_initializer(stream_vars)])
         while self.dataset.has_next_batch(self.batch_size, partition):
             for feed_dict in self._fill_feed_dict(partition, reshuffle=False):
                 self.sess.run([r2_update_op], feed_dict=feed_dict)
             r2_value = self.sess.run([r2_op])[0]
-        self.sess.run([tf.variables_initializer(stream_vars)])
-        return r2_value**2
+        return r2_value
