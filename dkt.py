@@ -1,16 +1,21 @@
 import argparse
-import numpy
+import pandas
+import dkt_model
 import utils
 
 from quick_experiment import dataset
-from quick_experiment.models import dkt
+from quick_experiment.models import lstm
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--logs_dirname', type=str, default=None,
+                        help='Path to directory to store tensorboard info')
     parser.add_argument('--filename', type=str,
                         help='The path to the pickled file with the processed'
                              'sequences.')
+    parser.add_argument('--test_predictions_filename', type=str,
+                        help='The path to the file to store the predictions')
     return parser.parse_args()
 
 
@@ -22,25 +27,8 @@ class DKTDataset(dataset.LabeledSequenceDataset):
 
     def classes_num(self, _=None):
         """The number of problems in the dataset"""
-        return self.feature_vector_size
-
-    def _pad_batch(self, batch_instances, batch_labels,
-                   max_sequence_length=None):
-        lengths = self._get_sequence_lengths(batch_instances)
-        padded_batch = numpy.zeros((batch_instances.shape[0],
-                                    max_sequence_length,
-                                    self.feature_vector_size))
-        padded_labels = numpy.zeros(
-            (batch_instances.shape[0], max_sequence_length, 2))
-        for index, sequence in enumerate(batch_instances):
-            if lengths[index] <= max_sequence_length:
-                padded_batch[index, :lengths[index]] = sequence
-                padded_labels[index, :lengths[index]] = batch_labels[index]
-            else:
-                padded_batch[index] = sequence[-max_sequence_length:]
-                padded_labels[index] = batch_labels[
-                    index][-max_sequence_length:]
-        return padded_batch, padded_labels, lengths
+        assert self.feature_vector_size % 2 == 0
+        return (self.feature_vector_size / 2) + 1
 
 
 def main():
@@ -48,19 +36,24 @@ def main():
     assistment_dataset = DKTDataset()
     sequences, labels = utils.pickle_from_file(args.filename)
     partitions = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
-    assistment_dataset.create_samples(
-        numpy.array([x.tocsr() for x in sequences]),
-        numpy.array([numpy.array(zip(*x)) for x in labels]),
-        partition_sizes=partitions, samples_num=1)
+    assistment_dataset.create_samples(sequences, labels,
+                                      partition_sizes=partitions, samples_num=1)
 
     assistment_dataset.set_current_sample(0)
 
     experiment_config = {
-        'hidden_layer_size': 20, 'batch_size': 500, 'logs_dirname': None,
-        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 10
+        'hidden_layer_size': 50, 'batch_size': 50,
+        'logs_dirname': args.logs_dirname,
+        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 50
     }
-    model = dkt.DKTModel(assistment_dataset, **experiment_config)
+    model = dkt_model.DktLSTMModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
+    predictions = pandas.DataFrame()
+    true_labels, predicted_labels = model.predict('test')
+    predictions['True'] = true_labels
+    predictions['Predictions'] = predicted_labels
+    predictions.to_csv(args.test_predictions_filename)
+
 
 
 if __name__ == '__main__':
