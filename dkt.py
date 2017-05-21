@@ -1,6 +1,7 @@
 import argparse
 import os
 import dkt_model
+import json
 import utils
 
 from quick_experiment import dataset
@@ -16,6 +17,8 @@ def parse_arguments():
                              'sequences.')
     parser.add_argument('--test_predictions_filename', type=str,
                         help='The path to the file to store the predictions')
+    parser.add_argument('--configuration_filename', type=str, default=None,
+                        help='Filename with json configuration dict.')
     return parser.parse_args()
 
 
@@ -31,21 +34,32 @@ class DKTDataset(dataset.LabeledSequenceDataset):
         return (self.feature_vector_size / 2) + 1
 
 
+def read_configuration(args):
+    if args.configuration_filename is None:
+        return {
+            'hidden_layer_size': 200, 'batch_size': 50,
+            'logs_dirname': args.logs_dirname,
+            'log_values': 50, 'training_epochs': 500, 'max_num_steps': 100
+        }, {'train': 0.7, 'test': 0.2, 'validation': 0.1}
+    with open(args.configuration_filename) as json_file:
+        config = json.load(json_file)
+    config['logs_dirname'] = args.logs_dirname
+    dataset_config = config.pop('dataset_config')
+    return config, dataset_config
+
+
 def main():
     args = parse_arguments()
     assistment_dataset = DKTDataset()
     sequences, labels = utils.pickle_from_file(args.filename)
-    partitions = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
+    experiment_config, partitions = read_configuration(args)
     assistment_dataset.create_samples(sequences, labels,
                                       partition_sizes=partitions, samples_num=1)
 
     assistment_dataset.set_current_sample(0)
 
-    experiment_config = {
-        'hidden_layer_size': 200, 'batch_size': 50,
-        'logs_dirname': args.logs_dirname,
-        'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 100
-    }
+    print 'Dataset Configuration'
+    print partitions
     print 'Experiment Configuration'
     print experiment_config
     model = dkt_model.DktLSTMModel(assistment_dataset, **experiment_config)

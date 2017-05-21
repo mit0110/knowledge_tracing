@@ -2,10 +2,10 @@
 import numpy
 import tensorflow as tf
 
-from quick_experiment.models import lstm
+from quick_experiment.models import seq_lstm
 
 
-class DktLSTMModel(lstm.SeqPredictionModel):
+class DktLSTMModel(seq_lstm.SeqLSTMModel):
 
     def _build_predictions(self, logits):
         """Return a tensor with the predicted performance of next exercise.
@@ -22,14 +22,13 @@ class DktLSTMModel(lstm.SeqPredictionModel):
             A float64 tensor with the predictions, with shape [batch_size,
             max_num_steps].
         """
-        predictions = tf.nn.softmax(logits, name='batch_predictions')
         # The elements of self.labels_placeholder contain the result of the
         # next exercise in the same position as the exercise id. The result
         # value can only be 0 or 1.
         # We multiply the predictions by the labels placeholder to filter out
         # the predictions for exercises that are not the next one.
         predictions = tf.reduce_max(tf.multiply(
-            predictions, tf.cast(self.labels_placeholder, predictions.dtype)),
+            logits, tf.cast(self.labels_placeholder, logits.dtype)),
             axis=2, name='predictions')
         return predictions
 
