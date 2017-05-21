@@ -46,6 +46,8 @@ def main():
         'logs_dirname': args.logs_dirname,
         'log_values': 100, 'training_epochs': 1000, 'max_num_steps': 100
     }
+    print 'Experiment Configuration'
+    print experiment_config
     model = dkt_model.DktLSTMModel(assistment_dataset, **experiment_config)
     model.fit(partition_name='train', close_session=False)
     predicted_labels = model.predict('test')
