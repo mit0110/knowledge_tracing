@@ -16,13 +16,13 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         """
         mask = tf.sequence_mask(self.lengths_placeholder, self.max_num_steps)
         # Labels can be 1 or -1, we will replace the -1 with p(1)=0.
+        labels = tf.cast(self.labels_placeholder, logits.dtype)
         loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=logits,
-            labels=tf.cast(tf.clip_by_value(self.labels_placeholder, 0), logits.dtype))
+            logits=logits, labels=tf.clip_by_value(labels, 0, 1))
         # loss has shape [batch_size, max_num_steps, classes_num]
         # We set to 0 the losses of the predictions of exercises that are not
         # the next one.
-        loss = tf.multiply(loss, tf.abs(self.labels_placeholder))
+        loss = tf.multiply(loss, tf.abs(labels))
         loss = tf.div(
             tf.reduce_sum(tf.boolean_mask(loss, mask)),
             tf.cast(tf.reduce_sum(self.lengths_placeholder), loss.dtype))
@@ -47,7 +47,9 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         # We leave only the predictions for the true next exercise.
         # We use the fact that labels_placeholder can be 1 or -1 for the next
         # exercise.
-        predictions = tf.multiply(predictions, tf.abs(self.labels_placeholder))
+        predictions = tf.multiply(
+            predictions,
+            tf.cast(tf.abs(self.labels_placeholder), predictions.dtype))
         # We keep only the predictions that are not 0. Should be only one per
         # step.
         predictions = tf.reduce_max(predictions, axis=2)
