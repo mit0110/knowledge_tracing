@@ -5,7 +5,6 @@ import json
 import utils
 
 from quick_experiment import dataset
-from quick_experiment.models import lstm
 
 
 def parse_arguments():
@@ -70,7 +69,6 @@ def main():
     utils.pickle_to_file(
         predicted_labels,
         os.path.join(args.test_predictions_filename, 'predictions.p'))
-
 
 
 if __name__ == '__main__':
