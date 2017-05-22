@@ -69,8 +69,11 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             # each prediction has shape [batch_size, max_num_step]
             predictions.append(step_prediction)
             lengths += feed_dict[self.lengths_placeholder]
-        predictions = numpy.vstack(predictions)
-        true = numpy.vstack(true)
+        predictions = numpy.hstack(predictions)
+        true = numpy.hstack(true)
+        assert predictions.shape[0] == self.batch_size
+        assert predictions.shape == true.shape
+        assert predictions.shape[1] >= lengths.max()
 
         short_predictions = []
         short_true = []
