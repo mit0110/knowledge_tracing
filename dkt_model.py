@@ -40,6 +40,18 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         predictions = tf.nn.sigmoid(logits)
         return predictions
 
+    @staticmethod
+    def _get_short_labels(labels, seq_indices):
+        """Returns only the labels or scores in true_indices plus the last one.
+        """
+        # Remove the prediction for the last class (the EOS symbol) and
+        # For the last timestep (which should predict the EOS).
+        seq_short_prediction = labels[:-1, :-1][seq_indices]
+        assert seq_short_prediction.ndim == 1
+        # Assert we took only one element per sequence.
+        assert seq_short_prediction.shape[0] == seq_indices.shape[0]
+        return numpy.append(seq_short_prediction, [labels[-1, -1]])
+
     def _get_batch_prediction(self, partition_name):
         true = []
         predictions = []
@@ -52,23 +64,28 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             predictions.append(step_prediction)
             # Get the true next exercise in the sequence.
             true_indices.append(
-                feed_dict[self.instances_placeholder][:, :, self.dataset.classes_num() - 1])
+                feed_dict[self.instances_placeholder][:, :, self.dataset.classes_num() - 1].astype(numpy.bool))
             lengths += feed_dict[self.lengths_placeholder]
-        # each prediction and true has shape [batch_size, max_num_step, classes_num - 1]
+        # each prediction and true has shape
+        # [batch_size, max_num_step, classes_num - 1]
         predictions = numpy.vstack(predictions)
         true = numpy.vstack(true)
-        # each true indices has shape [batch_size, max_num_step, classes_num - 1]
+        # each true indices has shape
+        # [batch_size, max_num_step, classes_num - 1]
         true_indices = numpy.vstack(true_indices)
 
         short_predictions = []
+        short_true = []
         for index, length in enumerate(lengths):
-            seq_prediction = predictions[index]
-
-
-            batch_prediction[index] = numpy.append(
-                batch_prediction[index], step_prediction[index, :length])
-            batch_true[index] = numpy.append(
-                batch_true[index], labels[index, :length])
+            # Shape [sequence_length, num_classes]
+            seq_prediction = predictions[index, :length]
+            # Shape [sequence_length - 1, num_classes -1]
+            seq_indices = true_indices[index, 1:length]
+            short_predictions.append(self._get_short_labels(
+                seq_prediction, seq_indices))
+            seq_true = true[index, :length]
+            short_true.append(self._get_short_labels(seq_true, seq_indices))
+        return short_true, short_predictions
 
     def predict(self, partition_name):
         """Applies the classifier to all elements in partition name.
@@ -87,11 +104,8 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         self.dataset.reset_batch()
         with self.graph.as_default():
             while self.dataset.has_next_batch(self.batch_size, partition_name):
-                self._get_batch_prediction(partition_name)
-                for feed_dict in self._fill_feed_dict(partition_name,
-                                                      reshuffle=False):
-                    self._get_step_predictions(batch_prediction, batch_true,
-                                               feed_dict)
+                batch_true, batch_prediction = self._get_batch_prediction(
+                    partition_name)
                 predictions.extend(batch_prediction)
                 true.extend(batch_true)
 
