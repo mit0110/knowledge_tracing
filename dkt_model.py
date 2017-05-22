@@ -15,7 +15,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         """
         mask = tf.sequence_mask(self.lengths_placeholder, self.max_num_steps)
         loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=logits, labels=self.labels_placeholder)
+            logits=logits, labels=tf.cast(self.labels_placeholder, logits.dtype))
         # loss has shape [batch_size, max_num_steps, classes_num]
         loss = tf.div(
             tf.reduce_sum(tf.boolean_mask(loss, mask)),
