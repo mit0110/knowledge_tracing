@@ -7,6 +7,21 @@ from quick_experiment.models import seq_lstm
 
 class DktLSTMModel(seq_lstm.SeqLSTMModel):
 
+    def _build_loss(self, logits):
+        """Calculates the avg binary cross entropy using the sigmoid function.
+
+        Args:
+            logits: Tensor - [batch_size, max_num_steps, classes_num]
+        """
+        mask = tf.sequence_mask(self.lengths_placeholder, self.max_num_steps)
+        loss = tf.nn.sigmoid_cross_entropy_with_logits(
+            logits=logits, labels=self.labels_placeholder)
+        # loss has shape [batch_size, max_num_steps, classes_num]
+        loss = tf.div(
+            tf.reduce_sum(tf.boolean_mask(loss, mask)),
+            tf.cast(tf.reduce_sum(self.lengths_placeholder), loss.dtype))
+        return loss
+
     def _build_predictions(self, logits):
         """Return a tensor with the predicted performance of next exercise.
 
@@ -16,27 +31,40 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
 
         Args:
             logits: Logits tensor, float - [batch_size, max_num_steps,
-                NUM_CLASSES (feature_vector_size + 1)].
+                num_classes].
 
         Returns:
             A float64 tensor with the predictions, with shape [batch_size,
-            max_num_steps].
+            max_num_steps, num_classes].
         """
-        # The elements of self.labels_placeholder contain the result of the
-        # next exercise in the same position as the exercise id. The result
-        # value can only be 0 or 1.
-        # We multiply the predictions by the labels placeholder to filter out
-        # the predictions for exercises that are not the next one.
-        predictions = tf.reduce_max(tf.multiply(
-            logits, tf.cast(self.labels_placeholder, logits.dtype)),
-            axis=2, name='predictions')
+        predictions = tf.nn.sigmoid(logits)
         return predictions
 
-    def _get_step_predictions(self, batch_prediction, batch_true, feed_dict):
-        step_prediction = self.sess.run(self.predictions, feed_dict=feed_dict)
-        labels = numpy.amax(feed_dict[self.labels_placeholder], axis=2)
-        assert labels.shape == step_prediction.shape
-        for index, length in enumerate(feed_dict[self.lengths_placeholder]):
+    def _get_batch_prediction(self, partition_name):
+        true = []
+        predictions = []
+        true_indices = []
+        lengths = numpy.zeros(self.batch_size)
+        for feed_dict in self._fill_feed_dict(partition_name, reshuffle=False):
+            step_prediction = self.sess.run(self.predictions,
+                                            feed_dict=feed_dict)
+            true.append(feed_dict[self.labels_placeholder])
+            predictions.append(step_prediction)
+            # Get the true next exercise in the sequence.
+            true_indices.append(
+                feed_dict[self.instances_placeholder][:, :, self.dataset.classes_num() - 1])
+            lengths += feed_dict[self.lengths_placeholder]
+        # each prediction and true has shape [batch_size, max_num_step, classes_num - 1]
+        predictions = numpy.vstack(predictions)
+        true = numpy.vstack(true)
+        # each true indices has shape [batch_size, max_num_step, classes_num - 1]
+        true_indices = numpy.vstack(true_indices)
+
+        short_predictions = []
+        for index, length in enumerate(lengths):
+            seq_prediction = predictions[index]
+
+
             batch_prediction[index] = numpy.append(
                 batch_prediction[index], step_prediction[index, :length])
             batch_true[index] = numpy.append(
@@ -54,8 +82,20 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             self.dataset.num_examples(partition_name). The elements of the list
             are the labels of the sequence represented as an array.
         """
-        # The logic is changed in _get_step_predictions
-        return super(DktLSTMModel, self).predict(partition_name)
+        predictions = []
+        true = []
+        self.dataset.reset_batch()
+        with self.graph.as_default():
+            while self.dataset.has_next_batch(self.batch_size, partition_name):
+                self._get_batch_prediction(partition_name)
+                for feed_dict in self._fill_feed_dict(partition_name,
+                                                      reshuffle=False):
+                    self._get_step_predictions(batch_prediction, batch_true,
+                                               feed_dict)
+                predictions.extend(batch_prediction)
+                true.extend(batch_true)
+
+        return numpy.array(true), numpy.array(predictions)
 
     def _build_evaluation(self, logits):
         """Evaluate the quality of the logits at predicting the label.
