@@ -88,8 +88,10 @@ def main():
         student_sequence = problem_vectorizer.transform(
             student_df[[identifier_column]])
         assert student_sequence.indices.shape[0] == student_df.shape[0]
-        student_results = student_sequence.multiply(sparse.csr_matrix(
-            student_df.correct.values).T)
+        student_results = student_df.correct.values
+        student_results[student_results == 0] = -1
+        student_results = student_sequence.multiply(
+            sparse.csr_matrix(student_results).T)
         sequences.append(sparse.hstack((student_sequence, student_results),
                                        dtype=numpy.int32))
         # Generate labels
