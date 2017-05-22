@@ -3,6 +3,7 @@ import numpy
 import tensorflow as tf
 
 from quick_experiment.models import seq_lstm
+from sklearn import metrics
 
 
 class DktLSTMModel(seq_lstm.SeqLSTMModel):
@@ -112,40 +113,19 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         return numpy.array(true), numpy.array(predictions)
 
     def _build_evaluation(self, logits):
-        """Evaluate the quality of the logits at predicting the label.
-
-        Args:
-            logits: Logits tensor, float - [batch_size, max_num_steps,
-                feature_vector + 1].
-        Returns:
-            A scalar int32 tensor with the number of examples (out of
-            batch_size) that were predicted correctly.
+        """Function not used. We need the full sequence to calculate the
+        performance, not step by step.
         """
-        predictions = self._build_predictions(logits)
-        # predictions has shape [batch_size, max_num_steps]
-        with tf.name_scope('evaluation_r2'):
-            mask = tf.sequence_mask(
-                self.lengths_placeholder, maxlen=self.max_num_steps,
-                dtype=predictions.dtype)
-            # We use the mask to ignore predictions outside the sequence length.
-            r2, r2_update = tf.contrib.metrics.streaming_pearson_correlation(
-                predictions, tf.cast(tf.reduce_max(
-                    self.labels_placeholder, axis=2), predictions.dtype),
-                weights=mask)
+        return None
 
-        return r2, r2_update
-
-    def evaluate_validation(self, correct_predictions):
+    def evaluate_validation(self, unused_arg):
         partition = 'validation'
-        # Reset the metric variables
-        stream_vars = [i for i in tf.local_variables()
-                       if i.name.split('/')[0] == 'evaluation_r2']
-        r2_op, r2_update_op = correct_predictions
-        self.dataset.reset_batch()
-        r2_value = None
-        self.sess.run([tf.variables_initializer(stream_vars)])
-        while self.dataset.has_next_batch(self.batch_size, partition):
-            for feed_dict in self._fill_feed_dict(partition, reshuffle=False):
-                self.sess.run([r2_update_op], feed_dict=feed_dict)
-            r2_value = self.sess.run([r2_op])[0]
-        return r2_value
+        true, predictions = self.predict(partition)
+        r2s = []
+        mse = []
+        for sequence_true, sequence_predicted in zip(true, predictions):
+            # Calculate the performance per sequence
+            r2s.append(metrics.r2_score(sequence_true, sequence_predicted))
+            mse.append(metrics.mean_squared_error(sequence_true,
+                                                  sequence_predicted))
+        return numpy.mean(r2s), numpy.mean(mse)
