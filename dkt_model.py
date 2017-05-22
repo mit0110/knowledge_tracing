@@ -15,9 +15,13 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             logits: Tensor - [batch_size, max_num_steps, classes_num]
         """
         mask = tf.sequence_mask(self.lengths_placeholder, self.max_num_steps)
+        # Labels can be 1 or -1, we will replace the -1 with p(1)=0.
         loss = tf.nn.sigmoid_cross_entropy_with_logits(
-            logits=logits, labels=self.labels_placeholder)
+            logits=logits, labels=tf.clip_by_value(self.labels_placeholder, 0))
         # loss has shape [batch_size, max_num_steps, classes_num]
+        # We set to 0 the losses of the predictions of exercises that are not
+        # the next one.
+        loss = tf.multiply(loss, tf.abs(self.labels_placeholder))
         loss = tf.div(
             tf.reduce_sum(tf.boolean_mask(loss, mask)),
             tf.cast(tf.reduce_sum(self.lengths_placeholder), loss.dtype))
@@ -27,8 +31,8 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         """Return a tensor with the predicted performance of next exercise.
 
         The prediction for each step is float with the probability of the
-        next exercise being correct. To know the true next execise we use
-        the information from self.labels_placeholder
+        next exercise being correct. To know the true next exercise we use
+        the id of the exercise that is not 0 from self.labels_placeholder
 
         Args:
             logits: Logits tensor, float - [batch_size, max_num_steps,
@@ -36,56 +40,40 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
 
         Returns:
             A float64 tensor with the predictions, with shape [batch_size,
-            max_num_steps, num_classes].
+            max_num_steps].
         """
         predictions = tf.nn.sigmoid(logits)
+        # We leave only the predictions for the true next exercise.
+        # We use the fact that labels_placeholder can be 1 or -1 for the next
+        # exercise.
+        predictions = tf.multiply(predictions, tf.abs(self.labels_placeholder))
+        # We keep only the predictions that are not 0. Should be only one per
+        # step.
+        predictions = tf.reduce_max(predictions, axis=2)
         return predictions
-
-    @staticmethod
-    def _get_short_labels(labels, seq_indices):
-        """Returns only the labels or scores in true_indices plus the last one.
-        """
-        # Remove the prediction for the last class (the EOS symbol) and
-        # For the last timestep (which should predict the EOS).
-        seq_short_prediction = labels[:-1, :-1][seq_indices]
-        assert seq_short_prediction.ndim == 1
-        # Assert we took only one element per sequence.
-        assert seq_short_prediction.shape[0] == seq_indices.shape[0]
-        return numpy.append(seq_short_prediction, [labels[-1, -1]])
 
     def _get_batch_prediction(self, partition_name):
         true = []
         predictions = []
-        true_indices = []
         lengths = numpy.zeros(self.batch_size)
         for feed_dict in self._fill_feed_dict(partition_name, reshuffle=False):
             step_prediction = self.sess.run(self.predictions,
                                             feed_dict=feed_dict)
-            true.append(feed_dict[self.labels_placeholder])
+            # each true has shape [batch_size, max_num_step, num_classes]
+            # we take the maximum value per time step, which will give us 1
+            # if the (only) exercise was solved correctly or 0 if not.
+            true.append(numpy.amax(feed_dict[self.labels_placeholder], axis=2))
+            # each prediction has shape [batch_size, max_num_step]
             predictions.append(step_prediction)
-            # Get the true next exercise in the sequence.
-            true_indices.append(
-                feed_dict[self.instances_placeholder][:, :, self.dataset.classes_num() - 1].astype(numpy.bool))
             lengths += feed_dict[self.lengths_placeholder]
-        # each prediction and true has shape
-        # [batch_size, max_num_step, classes_num - 1]
         predictions = numpy.vstack(predictions)
         true = numpy.vstack(true)
-        # each true indices has shape
-        # [batch_size, max_num_step, classes_num - 1]
-        true_indices = numpy.vstack(true_indices)
 
         short_predictions = []
         short_true = []
         for index, length in enumerate(lengths):
-            # Shape [sequence_length, num_classes]
-            seq_prediction = predictions[index, :length]
-            # Shape [sequence_length - 1, num_classes -1]
-            seq_indices = true_indices[index, 1:length]
-            short_predictions.append(self._get_short_labels(
-                seq_prediction, seq_indices))
-            seq_true = true[index, :length]
-            short_true.append(self._get_short_labels(seq_true, seq_indices))
+            short_predictions.append(predictions[index, :int(length)])
+            short_true.append(true[index, :int(length)])
         return short_true, short_predictions
 
     def predict(self, partition_name):
@@ -113,19 +101,42 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         return numpy.array(true), numpy.array(predictions)
 
     def _build_evaluation(self, logits):
-        """Function not used. We need the full sequence to calculate the
-        performance, not step by step.
-        """
-        return None
+        """Evaluate the quality of the logits at predicting the label.
 
-    def evaluate_validation(self, unused_arg):
+        Args:
+            logits: Logits tensor, float - [batch_size, max_num_steps,
+                feature_vector + 1].
+        Returns:
+            A scalar int32 tensor with the number of examples (out of
+            batch_size) that were predicted correctly.
+        """
+        predictions = self._build_predictions(logits)
+        # predictions has shape [batch_size, max_num_steps]
+        with tf.name_scope('evaluation_r2'):
+            mask = tf.sequence_mask(
+                self.lengths_placeholder, maxlen=self.max_num_steps,
+                dtype=predictions.dtype)
+            # We use the mask to ignore predictions outside the sequence length.
+
+            r2, r2_update = tf.contrib.metrics.streaming_pearson_correlation(
+                predictions, tf.cast(tf.reduce_max(
+                    self.labels_placeholder, axis=2), predictions.dtype),
+                weights=mask)
+
+        return r2, r2_update
+
+    def evaluate_validation(self, correct_predictions_op):
         partition = 'validation'
-        true, predictions = self.predict(partition)
-        r2s = []
-        mse = []
-        for sequence_true, sequence_predicted in zip(true, predictions):
-            # Calculate the performance per sequence
-            r2s.append(metrics.r2_score(sequence_true, sequence_predicted))
-            mse.append(metrics.mean_squared_error(sequence_true,
-                                                  sequence_predicted))
-        return numpy.mean(r2s), numpy.mean(mse)
+        # Reset the metric variables
+        stream_vars = [i for i in tf.local_variables()
+                       if i.name.split('/')[0] == 'evaluation_r2']
+        r2_op, r2_update_op = correct_predictions_op
+        self.dataset.reset_batch()
+        r2_value = None
+        self.sess.run([tf.variables_initializer(stream_vars)])
+        while self.dataset.has_next_batch(self.batch_size, partition):
+            for feed_dict in self._fill_feed_dict(partition, reshuffle=False):
+                self.sess.run([r2_update_op], feed_dict=feed_dict)
+            r2_value = self.sess.run([r2_op])[0]
+
+        return r2_value
