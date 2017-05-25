@@ -51,6 +51,7 @@ def read_configuration(args):
 def main():
     args = parse_arguments()
     assistment_dataset = DKTDataset()
+    print 'Reading dataset'
     sequences, labels = utils.pickle_from_file(args.filename)
     experiment_config, partitions = read_configuration(args)
     print 'Creating samples'
