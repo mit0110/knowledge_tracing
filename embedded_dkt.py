@@ -52,7 +52,7 @@ def main():
     print partitions
     print 'Experiment Configuration'
     print experiment_config
-    model = embedded_seq_lstm.EmbeddedSeqLSTMModel(assistment_dataset,
+    model = embedded_seq_lstm.EmbeddedSeqLSTMModel2(assistment_dataset,
                                                    **experiment_config)
     model.fit(partition_name='train', close_session=False)
     predicted_labels = model.predict('test')
