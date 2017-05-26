@@ -1,10 +1,14 @@
 """Script to extract the student sequences of problems and labels.
 
-The problems are represented as described in Piechs DKT implementation, using
+The problems are represented with a sequential id starting in 1, using
 as identifier the identifier_column argument.
 
+Both labels and instances are represented using the positive or negative
+id of the exercise being referenced. If the id is positive, it means the
+interaction was successful.
+
 The output is a pickled tuple where the first element are the sequences
-of one-hot representations in sparse format, and the second are the labels
+as a list of dense vectors, and the second are the labels.
 """
 
 import argparse
@@ -14,11 +18,9 @@ import numpy
 import pandas
 import sys
 
-from scipy import sparse
-from sklearn.preprocessing import OneHotEncoder
 from tqdm import tqdm
 
-sys.path.append(os.path.dirname(os.path.dirname( os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import utils
 logging.basicConfig(level=logging.INFO)
 
@@ -36,27 +38,37 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def EOS_vector(classes_num):
-    """A representation of the EOS symbol.
-
-    This is the class corresponding to the last element of each sequence."""
-    zeros = numpy.zeros(classes_num)
-    zeros[-1] = 1
-    return zeros
-
 def check_sequence(sequence, labels):
     """Checks if the labels are consistent with the sequences.
 
     If the label of step t has a positive number, it must be in the same
     position as the one-hot encoding of the exercise identifier in step t+1
     """
-    labels = labels.todense()
-    for index, element in enumerate(sequence.todense()[1:]):
+    for index, element in enumerate(sequence[1:]):
         label = labels[index]
-        if label.max() != 1.0:
-            continue
-        exercise_index = numpy.argmax(label)
-        assert element[0, exercise_index] == 1
+        assert numpy.abs(element) == numpy.abs(label)
+
+
+class ProblemEncoder(object):
+    def __init__(self, values):
+        self.encoding = {}
+        self._last_id = 1
+        for value in numpy.unique(values):
+            if value not in self.encoding:
+                self.encoding[value] = self.last_id
+                self._last_id += 1
+        print '{} different problems found'.format(self.last_id)
+
+    def encode(self, sequence):
+        encoded_sequence = []
+        for value in sequence:
+            assert value in self.encoding
+            encoded_sequence.append(self.encoding[value])
+        return numpy.array(encoded_sequence)
+
+    @property
+    def last_id(self):
+        return self._last_id
 
 
 def main():
@@ -70,43 +82,37 @@ def main():
     df.drop_duplicates(subset=['order_id'], keep='first', inplace=True)
 
     # Train the one hot encoder
-    problem_vectorizer = OneHotEncoder()
-    problem_vectorizer.fit(df[[identifier_column]])
+    problem_encoder = ProblemEncoder(df[[identifier_column]])
 
     # Separate the student sequences
     groups = df.groupby('user_id')
     student_dfs = [groups.get_group(x) for x in groups.groups]
     sequences = []
     labels = []
-    eos_vector = EOS_vector(len(problem_vectorizer.active_features_) + 1)
     for student_df in tqdm(student_dfs):
         student_df.sort_values(by='order_id', inplace=True)
         # Generate instances.
         # Each instance is a concatenation of the problem one hot encoding and
         # the one hot encoding vector multiplied point-wise by the 'correct'
         # column.
-        student_sequence = problem_vectorizer.transform(
-            student_df[[identifier_column]])
-        assert student_sequence.indices.shape[0] == student_df.shape[0]
+        student_sequence = problem_encoder.encode(
+            student_df[identifier_column].values)
+        assert student_sequence.shape[0] == student_df.shape[0]
         student_results = student_df.correct.values
-        student_results[student_results == 0] = -1
-        student_results = student_sequence.multiply(
-            sparse.csr_matrix(student_results).T)
-        sequences.append(sparse.hstack((student_sequence, student_results),
-                                       dtype=numpy.int32))
+        student_results[student_results == 0] = -1  # This has -1 or 1 values.
+
+        student_sequence = numpy.multiply(student_sequence, student_results)
+        sequences.append(student_sequence)
         # Generate labels
         # The label of a sequence is the outcome of the next interaction. We
-        # have to shift the student_results vector one place, expand the one-hot
-        # encoding size to support the End Of Sequence label (always positive)
-        # and add the label for the last element of the sequence.
-        sequence_labels = sparse.hstack([
-            student_results[1:],
-            numpy.zeros((student_results.shape[0] - 1, 1))])
-        sequence_labels = sparse.vstack([sequence_labels, eos_vector],
-                                        dtype=numpy.int32)
+        # have to shift the student_results vector one place and add the
+        # encoding size as the End Of Sequence label (always positive).
+        sequence_labels = numpy.append(student_sequence[1:],
+                                       [problem_encoder.last_id])
+        assert sequence_labels.shape == student_sequence.shape
         labels.append(sequence_labels)
         if args.check_output:
-            check_sequence(sequences[-1], sequence_labels)
+            check_sequence(student_sequence, sequence_labels)
 
     logging.info('Saving objects to file')
     utils.pickle_to_file((numpy.array(sequences), numpy.array(labels)),
