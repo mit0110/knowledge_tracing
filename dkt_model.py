@@ -26,6 +26,10 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         loss = tf.div(
             tf.reduce_sum(tf.boolean_mask(loss, mask)),
             tf.cast(tf.reduce_sum(self.lengths_placeholder), loss.dtype))
+
+        if self.logs_dirname:
+            tf.summary.scalar('train_loss', loss)
+
         return loss
 
     def _build_predictions(self, logits):
@@ -51,7 +55,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             predictions,
             tf.cast(tf.abs(self.labels_placeholder), predictions.dtype))
         # We keep only the predictions that are not 0. Should be only one per
-        # step.
+        # step because labels_placeholder is a one hot encoding.
         predictions = tf.reduce_max(predictions, axis=2)
         return predictions
 
@@ -113,8 +117,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             logits: Logits tensor, float - [batch_size, max_num_steps,
                 feature_vector + 1].
         Returns:
-            A scalar int32 tensor with the number of examples (out of
-            batch_size) that were predicted correctly.
+            A scalar float32 tensor with the pearson correlation
         """
         predictions = self._build_predictions(logits)
         # predictions has shape [batch_size, max_num_steps]
@@ -128,6 +131,9 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
                 predictions, tf.cast(tf.reduce_max(
                     self.labels_placeholder, axis=2), predictions.dtype),
                 weights=mask)
+
+        if self.logs_dirname:
+            tf.summary.scalar('eval_r2', r2)
 
         return r2, r2_update
 
