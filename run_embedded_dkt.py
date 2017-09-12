@@ -1,9 +1,9 @@
 import argparse
 import os
-import dkt_model
 import json
 import utils
 
+from models import embedded_dkt
 from quick_experiment import dataset
 
 
@@ -21,22 +21,11 @@ def parse_arguments():
     return parser.parse_args()
 
 
-class DKTDataset(dataset.LabeledSequenceDataset):
-
-    @property
-    def labels_type(self):
-        return self._labels[0].dtype
-
-    def classes_num(self, _=None):
-        """The number of problems in the dataset"""
-        assert self.feature_vector_size % 2 == 0
-        return (self.feature_vector_size / 2) + 1
-
-
 def read_configuration(args):
     if args.configuration_filename is None:
         return {
             'hidden_layer_size': 200, 'batch_size': 50,
+            'embedding_size': 200,
             'logs_dirname': args.logs_dirname,
             'log_values': 50, 'training_epochs': 500, 'max_num_steps': 100
         }, {'train': 0.7, 'test': 0.2, 'validation': 0.1}
@@ -49,8 +38,7 @@ def read_configuration(args):
 
 def main():
     args = parse_arguments()
-    assistment_dataset = DKTDataset()
-    print 'Reading dataset'
+    assistment_dataset = dataset.EmbeddedSequenceDataset()
     sequences, labels = utils.pickle_from_file(args.filename)
     experiment_config, partitions = read_configuration(args)
     print 'Creating samples'
@@ -64,7 +52,8 @@ def main():
     print partitions
     print 'Experiment Configuration'
     print experiment_config
-    model = dkt_model.DktLSTMModel(assistment_dataset, **experiment_config)
+    model = embedded_dkt.EmbeddedSeqLSTMModel2(assistment_dataset,
+                                               **experiment_config)
     model.fit(partition_name='train', close_session=False)
     predicted_labels = model.predict('test')
     utils.pickle_to_file(
