@@ -52,8 +52,8 @@ def main():
     print partitions
     print 'Experiment Configuration'
     print experiment_config
-    model = embedded_dkt.EmbeddedSeqLSTMModel2(assistment_dataset,
-                                               **experiment_config)
+    model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
+                                                   **experiment_config)
     model.fit(partition_name='train', close_session=False)
     predicted_labels = model.predict('test')
     utils.pickle_to_file(
