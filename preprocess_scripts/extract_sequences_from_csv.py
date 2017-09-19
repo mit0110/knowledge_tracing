@@ -44,6 +44,7 @@ def EOS_vector(classes_num):
     zeros[-1] = 1
     return zeros
 
+
 def check_sequence(sequence, labels):
     """Checks if the labels are consistent with the sequences.
 

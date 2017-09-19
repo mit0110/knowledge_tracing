@@ -2,6 +2,8 @@
 import numpy
 import tensorflow as tf
 
+from tensorflow.contrib.tensorboard.plugins import projector
+from tensorflow.python.ops.math_ops import tanh
 from quick_experiment.models import seq_lstm
 
 
@@ -45,26 +47,32 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
         """Returns self.element_embeddings + self.positive_embeddings if
         the element is positive, and self.element_embedding is is negative."""
         embedded_element = tf.nn.embedding_lookup(
-            element_embeddings, tf.abs(element_ids))
+            element_embeddings, tf.abs(element_ids), name='embedded_element')
         if element_only:
             return embedded_element
         embedded_outcome = tf.nn.embedding_lookup(
             positive_embedding,
             tf.clip_by_value(element_ids, clip_value_min=0,
-                             clip_value_max=self.dataset.feature_vector_size))
-        return tf.add_n([embedded_element, embedded_outcome])
+                             clip_value_max=self.dataset.feature_vector_size),
+            name='embedded_outcome')
+
+        return tf.add_n([embedded_element, embedded_outcome],
+                        name='full_embedding')
 
     def _build_input_layers(self):
         with tf.name_scope('embedding_layer') as scope:
+            self.base_embedding = tf.Variable(
+                tf.random_uniform([self.dataset.feature_vector_size,
+                                   self.embedding_size], 0, 1.0),
+                trainable=True, name='base_embedding')
             element_embeddings = tf.concat([
-                tf.zeros([1, self.embedding_size]),
-                tf.Variable(tf.random_uniform([self.dataset.feature_vector_size,
-                                               self.embedding_size], 0, 1.0),
-                            trainable=True)], 0, name="element_embedding")
-            positive_embedding = tf.concat([
-                tf.Variable(tf.random_uniform([self.dataset.feature_vector_size,
-                                               self.embedding_size], 0, 1.0),
-                            trainable=True)], 0, name="positive_embedding")
+                tf.zeros([1, self.embedding_size]), self.base_embedding], 0)
+            self.positive_embedding = tf.Variable(
+                tf.random_uniform([self.dataset.feature_vector_size,
+                                   self.embedding_size], 0, 1.0),
+                trainable=True, name='positive_embedding')
+            positive_embedding = tf.concat([tf.zeros([1, self.embedding_size]),
+                                            self.positive_embedding], 0)
             input = self._get_embedding(self.instances_placeholder,
                                         element_embeddings,
                                         positive_embedding)
@@ -172,3 +180,104 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
             tf.summary.scalar('evaluation_mse', mse)
 
         return mse, mse_update
+
+    def write_embeddings(self, metadata_path):
+        with self.graph.as_default():
+            config = projector.ProjectorConfig()
+
+            # Add base embedding
+            embedding = config.embeddings.add()
+            embedding.tensor_name = self.base_embedding.name
+            # Link this tensor to its metadata file
+            embedding.metadata_path = metadata_path
+
+            # Add positive embedding
+            embedding = config.embeddings.add()
+            embedding.tensor_name = self.positive_embedding.name
+            # Link this tensor to the same metadata file
+            embedding.metadata_path = metadata_path
+
+            # Saves a configuration file that TensorBoard will read
+            # during startup.
+            projector.visualize_embeddings(self.summary_writer, config)
+
+
+class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
+    """BasicLSTMCell to transform the input before running the cell."""
+
+    def __init__(self, num_units, forget_bias=1.0, input_size=None,
+                 state_is_tuple=True, activation=tanh, reuse=None,
+                 modifier_function=None):
+        super(EmbeddedBasicLSTMCell, self).__init__(
+            num_units, forget_bias=forget_bias, state_is_tuple=state_is_tuple,
+            activation=activation, reuse=reuse)
+        self.modifier_function = modifier_function
+
+    def call(self, inputs, state):
+        """Long short-term memory cell (LSTM).
+
+        Args:
+            inputs: `2-D` tensor with shape `[batch_size x input_size]`.
+            state: An `LSTMStateTuple` of state tensors, each shaped
+                `[batch_size x self.state_size]`, if `state_is_tuple` has been
+                set to `True`.  Otherwise, a `Tensor` shaped
+                `[batch_size x 2 * self.state_size]`.
+        Returns:
+            A pair containing the new hidden state, and the new state (either a
+            `LSTMStateTuple` or a concatenated state, depending on
+            `state_is_tuple`).
+        """
+        if self._state_is_tuple:
+            c, h = state
+        else:
+            raise ValueError('EmbeddedBasicLSTMCell must use a state tuple')
+        # if self.modifier_function is not None:
+        inputs = tf.subtract(inputs, h)
+        print inputs, state
+        return super(EmbeddedBasicLSTMCell, self).call(inputs, state)
+
+
+class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer.
+    """
+    def __init__(self, dataset, name=None, hidden_layer_size=0, batch_size=None,
+                 training_epochs=1000, logs_dirname='.', log_values=True,
+                 max_num_steps=30, embedding_size=200, dropout_ratio=0.3,
+                 **kwargs):
+        super(CoEmbeddedSeqLSTMModel, self).__init__(
+            dataset, batch_size=batch_size, training_epochs=training_epochs,
+            logs_dirname=logs_dirname, name=name, log_values=log_values,
+            dropout_ratio=dropout_ratio, hidden_layer_size=hidden_layer_size,
+            max_num_steps=max_num_steps, embedding_size=embedding_size,
+            **kwargs)
+
+    def _build_rnn_cell(self):
+        return EmbeddedBasicLSTMCell(self.hidden_layer_size, forget_bias=1.0)
+
+    def _build_recurrent_layer(self):
+        # The recurrent layer
+        input = self._build_input_layers()
+        rnn_cell = self._build_rnn_cell()
+        with tf.name_scope('recurrent_layer') as scope:
+            # Get the initial state. States will be a LSTMStateTuples.
+            state_variable = self._build_state_variables(rnn_cell)
+            # outputs is a Tensor shaped [batch_size, max_time,
+            # cell.output_size].
+            # State is a Tensor shaped [batch_size, cell.state_size]
+            outputs, new_state = tf.nn.dynamic_rnn(
+                rnn_cell, inputs=input,
+                sequence_length=self.lengths_placeholder, scope=scope,
+                initial_state=state_variable)
+            # Define the state operations. This wont execute now.
+            self.last_state_op = self._get_state_update_op(state_variable,
+                                                           new_state)
+            self.reset_state_op = self._get_state_update_op(
+                state_variable,
+                rnn_cell.zero_state(self.batch_size, tf.float32))
+        return outputs

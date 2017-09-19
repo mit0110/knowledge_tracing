@@ -35,6 +35,9 @@ def parse_arguments():
                         help='The column to use as identifier.')
     parser.add_argument('--check_output', action='store_true',
                         help='Checks if the labels are consistent.')
+    parser.add_argument('--embedding_info', type=str,
+                        help='Filename to store extra information for the '
+                             'element embeddings according to their id.')
     return parser.parse_args()
 
 
@@ -52,10 +55,12 @@ def check_sequence(sequence, labels):
 class ProblemEncoder(object):
     def __init__(self, values):
         self.encoding = {}
+        self.values = []
         self._last_id = 1
         for value in numpy.unique(values):
             if value not in self.encoding:
                 self.encoding[value] = self.last_id
+                self.values.append(value)
                 self._last_id += 1
         print '{} different problems found'.format(self.last_id)
 
@@ -74,7 +79,8 @@ class ProblemEncoder(object):
 def main():
     args = parse_arguments()
     identifier_column = args.identifier_column
-    important_columns = ['order_id', 'user_id', identifier_column, 'correct']
+    important_columns = ['order_id', 'user_id', identifier_column, 'correct',
+                         'new_skill_id', 'template_id']
     logging.info('Reading csv file.')
     df = pandas.read_csv(args.filename, usecols=important_columns)
 
@@ -117,6 +123,20 @@ def main():
     logging.info('Saving objects to file')
     utils.pickle_to_file((numpy.array(sequences), numpy.array(labels)),
                          args.output_filename)
+    del sequences
+    del labels
+    if args.embedding_info is None:
+        return
+
+    logging.info('Saving embedding information')
+    with open(args.embedding_info, 'w') as embedding_meta_file:
+        embedding_meta_file.write('Skill\tTemplate\n')
+        for value in problem_encoder.values:
+            value_df = df[df[identifier_column] == value].iloc[0]
+            skill = value_df['new_skill_id']
+            template = value_df['template_id']
+            embedding_meta_file.write('{}\t{}\n'.format(skill, template))
+
     logging.info('All operations completed')
 
 

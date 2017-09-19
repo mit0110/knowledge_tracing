@@ -18,6 +18,9 @@ def parse_arguments():
                         help='The path to the file to store the predictions')
     parser.add_argument('--configuration_filename', type=str, default=None,
                         help='Filename with json configuration dict.')
+    parser.add_argument('--embedding_metadata', type=str, default=None,
+                        help='Filename with tsv metadata for embeddings.'
+                             'MUST BE ABSOLUTE PATH')
     return parser.parse_args()
 
 
@@ -53,8 +56,9 @@ def main():
     print 'Experiment Configuration'
     print experiment_config
     model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
-                                                   **experiment_config)
+                                              **experiment_config)
     model.fit(partition_name='train', close_session=False)
+    model.write_embeddings(args.embedding_metadata)
     predicted_labels = model.predict('test')
     utils.pickle_to_file(
         predicted_labels,

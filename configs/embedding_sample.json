@@ -1,1 +1,1 @@
-{"hidden_layer_size": 10, "log_values": 10, "batch_size": 5, "embedding_size": 20, "dataset_config": {"test": 0.2, "train": 0.1, "validation": 0.1}, "max_num_steps": 3, "training_epochs": 10}
+{"hidden_layer_size": 10, "log_values": 10, "batch_size": 5, "embedding_size": 10, "dataset_config": {"test": 0.2, "train": 0.1, "validation": 0.1}, "max_num_steps": 3, "training_epochs": 20}
