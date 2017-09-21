@@ -232,8 +232,7 @@ class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
         else:
             raise ValueError('EmbeddedBasicLSTMCell must use a state tuple')
         # if self.modifier_function is not None:
-        inputs = tf.subtract(inputs, h)
-        print inputs, state
+        inputs = tf.abs(tf.subtract(inputs, h))
         return super(EmbeddedBasicLSTMCell, self).call(inputs, state)
 
 

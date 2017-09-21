@@ -3,7 +3,6 @@ import numpy
 import tensorflow as tf
 
 from quick_experiment.models import seq_lstm
-from sklearn import metrics
 
 
 class DktLSTMModel(seq_lstm.SeqLSTMModel):

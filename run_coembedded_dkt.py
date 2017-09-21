@@ -55,8 +55,8 @@ def main():
     print partitions
     print 'Experiment Configuration'
     print experiment_config
-    model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
-                                              **experiment_config)
+    model = embedded_dkt.CoEmbeddedSeqLSTMModel(assistment_dataset,
+                                                **experiment_config)
     model.fit(partition_name='train', close_session=False)
     if args.embedding_metadata is not None:
         model.write_embeddings(args.embedding_metadata)
