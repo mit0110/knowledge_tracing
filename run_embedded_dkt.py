@@ -58,7 +58,8 @@ def main():
     model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
                                               **experiment_config)
     model.fit(partition_name='train', close_session=False)
-    model.write_embeddings(args.embedding_metadata)
+    if args.embedding_metadata is not None:
+        model.write_embeddings(args.embedding_metadata)
     predicted_labels = model.predict('test')
     utils.pickle_to_file(
         predicted_labels,
