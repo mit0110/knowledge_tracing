@@ -77,7 +77,8 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
                                         element_embeddings,
                                         positive_embedding)
             if self.dropout_ratio != 0:
-                return tf.layers.dropout(inputs=input, rate=self.dropout_ratio)
+                return tf.layers.dropout(inputs=input,
+                                         rate=self.dropout_placeholder)
             return input
 
     def _build_loss(self, logits):

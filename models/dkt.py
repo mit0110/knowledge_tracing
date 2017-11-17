@@ -63,6 +63,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         predictions = []
         lengths = numpy.zeros(self.batch_size)
         for feed_dict in self._fill_feed_dict(partition_name, reshuffle=False):
+            feed_dict[self.dropout_placeholder] = 0
             step_prediction = self.sess.run(self.predictions,
                                             feed_dict=feed_dict)
             # each true has shape [batch_size, max_num_step, num_classes]
@@ -147,6 +148,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         self.sess.run([tf.variables_initializer(stream_vars)])
         while self.dataset.has_next_batch(self.batch_size, partition):
             for feed_dict in self._fill_feed_dict(partition, reshuffle=False):
+                feed_dict[self.dropout_placeholder] = 0
                 self.sess.run([r2_update_op], feed_dict=feed_dict)
             r2_value = self.sess.run([r2_op])[0]
 
