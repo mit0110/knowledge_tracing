@@ -63,7 +63,7 @@ def main():
 
     for run in range(args.runs):
         print 'Running iteration {} of {}'.format(run + 1, args.runs)
-        assistment_dataset.set_current_sample(0)
+        assistment_dataset.set_current_sample(run)
         tf.reset_default_graph()
         logs_dirname = os.path.join(args.base_logs_dirname, 'run{}'.format(run))
         utils.safe_mkdir(logs_dirname)
