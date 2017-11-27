@@ -76,10 +76,11 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
             input = self._get_embedding(self.instances_placeholder,
                                         element_embeddings,
                                         positive_embedding)
-            if self.dropout_ratio != 0:
-                return tf.layers.dropout(inputs=input,
-                                         rate=self.dropout_placeholder)
-            return input
+        self._build_dropout()
+        if self.dropout_ratio != 0:
+            return tf.nn.dropout(input,
+                                 keep_prob=self.dropout_placeholder)
+        return input
 
     def _build_loss(self, logits):
         """Calculates the average binary cross entropy.
