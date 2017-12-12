@@ -44,15 +44,15 @@ def analyze_split(split, dataset):
     train_ids = split['train_ids']
     test_ids = split['test_ids']
     train_sequences_size = dataset.set_index('user_id').loc[train_ids].shape[0]
-    print 'Students in train {} ({:.4}%), Students in test {}({:.4}%)'.format(
+    print('Students in train {} ({:.4}%), Students in test {}({:.4}%)'.format(
         len(train_ids), len(train_ids) / float(student_ids.shape[0]),
-        len(test_ids), len(test_ids) / float(student_ids.shape[0]))
-    print 'New train dataset size = ', train_sequences_size
-    print 'Real proportion ', train_sequences_size/float(dataset.shape[0])
+        len(test_ids), len(test_ids) / float(student_ids.shape[0])))
+    print('New train dataset size = ', train_sequences_size)
+    print('Real proportion ', train_sequences_size/float(dataset.shape[0]))
 
 
 def create_split(dataset, train_size, test_size):
-    print 'Creating new split'
+    print('Creating new split')
     student_ids = dataset.user_id.unique()
     train_ids = set(np.random.choice(
         student_ids, int(student_ids.shape[0] * train_size), replace=False))
@@ -107,12 +107,12 @@ def main():
 
     dataset = dataset.set_index('user_id')
     # Open the output files
-    print 'Creating train file'
+    print('Creating train file')
     with open(os.path.join(args.output_dirname, 'train.txt'), 'w') as file_:
         # Create the sequences
         get_sequences(dataset.loc[split['train_ids']].reset_index(),
                       args.problem_identifier, file_)
-    print 'Creating test file'
+    print('Creating test file')
     with open(os.path.join(args.output_dirname, 'test.txt'), 'w') as file_:
         get_sequences(dataset.loc[split['test_ids']].reset_index(),
                       args.problem_identifier, file_)

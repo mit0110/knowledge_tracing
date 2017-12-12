@@ -1,6 +1,10 @@
 """Helper functions."""
 
-import cPickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 import logging
 import os
 
@@ -15,11 +19,11 @@ def safe_mkdir(dir_name):
 
 def pickle_to_file(object_, filename):
     """Dumps object to filename in cPickle format"""
-    with open(filename, 'w') as file_:
-        cPickle.dump(object_, file_, cPickle.HIGHEST_PROTOCOL)
+    with open(filename, 'wb') as file_:
+        pickle.dump(object_, file_)
 
 
 def pickle_from_file(filename):
     """Reads object from filename in cPickle format"""
-    with open(filename, 'r') as file_:
-        return cPickle.load(file_)
+    with open(filename, 'rb') as file_:
+        return pickle.load(file_)

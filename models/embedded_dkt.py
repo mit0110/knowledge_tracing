@@ -14,11 +14,11 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
     input is first passed by an embedding layer to reduce dimensionality.
     """
     def __init__(self, dataset, name=None, hidden_layer_size=0, batch_size=None,
-                 training_epochs=1000, logs_dirname='.', log_values=True,
+                 logs_dirname='.', log_values=True,
                  max_num_steps=30, embedding_size=200, dropout_ratio=0.3,
                  **kwargs):
         super(EmbeddedSeqLSTMModel, self).__init__(
-            dataset, batch_size=batch_size, training_epochs=training_epochs,
+            dataset, batch_size=batch_size,
             logs_dirname=logs_dirname, name=name, log_values=log_values,
             dropout_ratio=dropout_ratio, hidden_layer_size=hidden_layer_size,
             max_num_steps=max_num_steps, **kwargs)
@@ -78,8 +78,8 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
                                         positive_embedding)
         self._build_dropout()
         if self.dropout_ratio != 0:
-            return tf.nn.dropout(input,
-                                 keep_prob=self.dropout_placeholder)
+            return tf.layers.dropout(inputs=input,
+                                     rate=self.dropout_placeholder)
         return input
 
     def _build_loss(self, logits):
@@ -233,7 +233,7 @@ class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
             c, h = state
         else:
             raise ValueError('EmbeddedBasicLSTMCell must use a state tuple')
-        # if self.modifier_function is not None:
+        # TODO if self.modifier_function is not None:
         inputs = tf.abs(tf.subtract(inputs, h))
         return super(EmbeddedBasicLSTMCell, self).call(inputs, state)
 
@@ -248,11 +248,11 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
     network before entering the hidden layer.
     """
     def __init__(self, dataset, name=None, hidden_layer_size=0, batch_size=None,
-                 training_epochs=1000, logs_dirname='.', log_values=True,
+                 logs_dirname='.', log_values=True,
                  max_num_steps=30, embedding_size=200, dropout_ratio=0.3,
                  **kwargs):
         super(CoEmbeddedSeqLSTMModel, self).__init__(
-            dataset, batch_size=batch_size, training_epochs=training_epochs,
+            dataset, batch_size=batch_size,
             logs_dirname=logs_dirname, name=name, log_values=log_values,
             dropout_ratio=dropout_ratio, hidden_layer_size=hidden_layer_size,
             max_num_steps=max_num_steps, embedding_size=embedding_size,

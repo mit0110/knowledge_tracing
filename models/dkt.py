@@ -86,7 +86,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             short_true.append(true[index, :int(length)])
         return short_true, short_predictions
 
-    def predict(self, partition_name):
+    def predict(self, partition_name, limit=-1):
         """Applies the classifier to all elements in partition name.
 
         Returns:
@@ -102,7 +102,8 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         true = []
         self.dataset.reset_batch()
         with self.graph.as_default():
-            while self.dataset.has_next_batch(self.batch_size, partition_name):
+            while (self.dataset.has_next_batch(self.batch_size, partition_name)
+                   and (limit <= 0 or len(predictions) < limit)):
                 batch_true, batch_prediction = self._get_batch_prediction(
                     partition_name)
                 predictions.extend(batch_prediction)
@@ -121,36 +122,36 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         """
         predictions = self._build_predictions(logits)
         # predictions has shape [batch_size, max_num_steps]
-        with tf.name_scope('evaluation_r2'):
+        with tf.name_scope('evaluation_performance'):
             mask = tf.sequence_mask(
                 self.lengths_placeholder, maxlen=self.max_num_steps,
                 dtype=predictions.dtype)
             # We use the mask to ignore predictions outside the sequence length.
+            labels = tf.cast(tf.reduce_max(
+                    self.labels_placeholder, axis=2), predictions.dtype)
 
-            r2, r2_update = tf.contrib.metrics.streaming_pearson_correlation(
-                predictions, tf.cast(tf.reduce_max(
-                    self.labels_placeholder, axis=2), predictions.dtype),
-                weights=mask)
+            mse, mse_update = tf.contrib.metrics.streaming_mean_squared_error(
+                predictions, labels, weights=mask)
 
         if self.logs_dirname:
-            tf.summary.scalar('eval_r2', r2)
+            tf.summary.scalar('eval_mse', mse)
 
-        return r2, r2_update
+        return mse, mse_update
 
-    def evaluate_validation(self, correct_predictions_op):
+    def evaluate_validation(self, evaluation_op):
         partition = 'validation'
         # Reset the metric variables
         stream_vars = [i for i in tf.local_variables()
                        if i.name.split('/')[0] == 'evaluation_r2']
-        r2_op, r2_update_op = correct_predictions_op
+        mse, mse_update = evaluation_op
         self.dataset.reset_batch()
-        r2_value = None
+        mse_value = None
         self.sess.run([tf.variables_initializer(stream_vars)])
         while self.dataset.has_next_batch(self.batch_size, partition):
             for feed_dict in self._fill_feed_dict(partition, reshuffle=False):
                 feed_dict[self.dropout_placeholder] = 0
-                self.sess.run([r2_update_op], feed_dict=feed_dict)
-            r2_value = self.sess.run([r2_op])[0]
+                self.sess.run([mse_update], feed_dict=feed_dict)
+            mse_value = self.sess.run([mse])[0]
 
-        return r2_value
+        return mse_value
 

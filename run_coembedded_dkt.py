@@ -22,6 +22,8 @@ def parse_arguments():
                         help='The path to the dir to store the predictions')
     parser.add_argument('--configuration_filename', type=str, default=None,
                         help='Filename with json configuration dict.')
+    parser.add_argument('--training_epochs', type=int, default=1000,
+                        help='The number of epochs to run.')
     parser.add_argument('--embedding_metadata', type=str, default=None,
                         help='Filename with tsv metadata for embeddings. '
                              'MUST BE AN ABSOLUTE PATH')
@@ -33,7 +35,7 @@ def read_configuration(args):
         return {
             'hidden_layer_size': 200, 'batch_size': 50,
             'embedding_size': 200,
-            'log_values': 50, 'training_epochs': 500, 'max_num_steps': 100
+            'log_values': 50, 'max_num_steps': 100
         }, {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     with open(args.configuration_filename) as json_file:
         config = json.load(json_file)
@@ -46,28 +48,31 @@ def main():
     assistment_dataset = dataset.EmbeddedSequenceDataset()
     sequences, labels = utils.pickle_from_file(args.filename)
 
-    print 'Experiment Configuration'
+    print('Experiment Configuration')
     experiment_config, partitions = read_configuration(args)
-    print experiment_config
+    print(experiment_config)
 
-    print 'Creating samples'
+    print('Creating samples')
     assistment_dataset.create_samples(
         sequences, labels, partition_sizes=partitions, samples_num=args.runs,
         sort_by_length=True)
-    print 'Dataset Configuration'
-    print partitions
+    print('Dataset Configuration')
+    print(partitions)
 
     # Check all directories exist
-    utils.safe_mkdir(args.base_logs_dirname)
+    if args.base_logs_dirname:
+        utils.safe_mkdir(args.base_logs_dirname)
     utils.safe_mkdir(args.test_prediction_dir)
 
     for run in range(args.runs):
-        print 'Running iteration {} of {}'.format(run + 1, args.runs)
+        print('Running iteration {} of {}'.format(run + 1, args.runs))
         assistment_dataset.set_current_sample(run)
-        tf.reset_default_graph()
-        logs_dirname = os.path.join(args.base_logs_dirname, 'run{}'.format(run))
-        utils.safe_mkdir(logs_dirname)
-        experiment_config['logs_dirname'] = logs_dirname
+        if args.base_logs_dirname:
+            tf.reset_default_graph()
+            logs_dirname = os.path.join(args.base_logs_dirname,
+                                        'run{}'.format(run))
+            utils.safe_mkdir(logs_dirname)
+            experiment_config['logs_dirname'] = logs_dirname
         model = embedded_dkt.CoEmbeddedSeqLSTMModel(assistment_dataset,
                                                     **experiment_config)
         model.fit(partition_name='train', close_session=False)
@@ -79,7 +84,7 @@ def main():
             args.test_prediction_dir, 'predictions_run{}.p'.format(run))
         utils.pickle_to_file(predicted_labels, prediction_dirname)
 
-    print 'All operations finished'
+    print('All operations finished')
 
 if __name__ == '__main__':
     main()
