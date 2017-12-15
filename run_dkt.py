@@ -73,6 +73,9 @@ def main():
     utils.pickle_to_file(
         predicted_labels,
         os.path.join(args.test_predictions_filename, 'predictions.p'))
+    utils.pickle_to_file(
+        (model.training_performance, model.validation_performance),
+        os.path.join(args.test_predictions_filename, 'performances.p'))
 
 
 if __name__ == '__main__':
