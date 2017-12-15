@@ -75,11 +75,14 @@ def main():
             experiment_config['logs_dirname'] = logs_dirname
         model = embedded_dkt.CoEmbeddedSeqLSTMModel(assistment_dataset,
                                                     **experiment_config)
-        model.fit(partition_name='train', close_session=False)
+        model.fit(partition_name='train',
+                  training_epochs=args.training_epochs,
+                  close_session=False)
         if args.embedding_metadata is not None:
             model.write_embeddings(args.embedding_metadata)
 
         predicted_labels = model.predict('test')
+        model.sess.close()
         prediction_dirname = os.path.join(
             args.test_prediction_dir, 'predictions_run{}.p'.format(run))
         utils.pickle_to_file(predicted_labels, prediction_dirname)

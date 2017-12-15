@@ -261,9 +261,8 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
     def _build_rnn_cell(self):
         return EmbeddedBasicLSTMCell(self.hidden_layer_size, forget_bias=1.0)
 
-    def _build_recurrent_layer(self):
+    def _build_recurrent_layer(self, input):
         # The recurrent layer
-        input = self._build_input_layers()
         rnn_cell = self._build_rnn_cell()
         with tf.name_scope('recurrent_layer') as scope:
             # Get the initial state. States will be a LSTMStateTuples.

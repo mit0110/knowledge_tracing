@@ -135,23 +135,25 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
 
         if self.logs_dirname:
             tf.summary.scalar('eval_mse', mse)
+            tf.summary.scalar('eval_up_mse', mse_update)
 
         return mse, mse_update
 
-    def evaluate_validation(self, evaluation_op):
-        partition = 'validation'
-        # Reset the metric variables
-        stream_vars = [i for i in tf.local_variables()
-                       if i.name.split('/')[0] == 'evaluation_r2']
-        mse, mse_update = evaluation_op
-        self.dataset.reset_batch()
-        mse_value = None
-        self.sess.run([tf.variables_initializer(stream_vars)])
-        while self.dataset.has_next_batch(self.batch_size, partition):
-            for feed_dict in self._fill_feed_dict(partition, reshuffle=False):
-                feed_dict[self.dropout_placeholder] = 0
-                self.sess.run([mse_update], feed_dict=feed_dict)
-            mse_value = self.sess.run([mse])[0]
+    def evaluate(self, partition='validation'):
+        with self.graph.as_default():
+            # Reset the metric variables
+            stream_vars = [i for i in tf.local_variables()
+                           if i.name.split('/')[0] == 'evaluation_r2']
+            mse, mse_update = self.evaluation_op
+            self.dataset.reset_batch()
+            mse_value = None
+            self.sess.run([tf.variables_initializer(stream_vars)])
+            while self.dataset.has_next_batch(self.batch_size, partition):
+                for feed_dict in self._fill_feed_dict(partition,
+                                                      reshuffle=False):
+                    feed_dict[self.dropout_placeholder] = 0
+                    self.sess.run([mse_update], feed_dict=feed_dict)
+                mse_value = self.sess.run([mse])[0]
 
         return mse_value
 
