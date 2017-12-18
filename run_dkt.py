@@ -27,6 +27,9 @@ def parse_arguments():
                              'the accuracy in validation.')
     parser.add_argument('--max_num_steps', type=int, default=100,
                         help='Number of time steps to unroll the network.')
+    parser.add_argument('--dropout_ratio', type=float, default=0.3,
+                        help='Dropout for the input layer and the recurrent '
+                             'layer.')
 
 
     return parser.parse_args()
@@ -51,6 +54,7 @@ def read_configuration(args):
         'logs_dirname': args.logs_dirname,
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
+
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config

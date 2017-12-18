@@ -35,6 +35,9 @@ def parse_arguments():
     parser.add_argument('--embedding_metadata', type=str, default=None,
                         help='Filename with tsv metadata for embeddings. '
                              'MUST BE AN ABSOLUTE PATH')
+    parser.add_argument('--dropout_ratio', type=float, default=0.3,
+                        help='Dropout for the input layer and the recurrent '
+                             'layer.')
     return parser.parse_args()
 
 
@@ -46,6 +49,7 @@ def read_configuration(args):
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
         'embedding_size': args.hidden_layer_size,
+        'dropout_ratio': args.dropout_ratio
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config
