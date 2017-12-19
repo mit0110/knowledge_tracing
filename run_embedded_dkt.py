@@ -1,6 +1,5 @@
 import argparse
 import os
-import json
 import utils
 
 from models import embedded_dkt
