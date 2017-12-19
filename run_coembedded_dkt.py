@@ -45,7 +45,6 @@ def read_configuration(args):
     config = {
         'hidden_layer_size': args.hidden_layer_size,
         'batch_size': args.batch_size,
-        'logs_dirname': args.logs_dirname,
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
         'embedding_size': args.hidden_layer_size,
@@ -98,6 +97,10 @@ def main():
         prediction_dirname = os.path.join(
             args.test_prediction_dir, 'predictions_run{}.p'.format(run))
         utils.pickle_to_file(predicted_labels, prediction_dirname)
+        utils.pickle_to_file(
+            (model.training_performance, model.validation_performance),
+            os.path.join(args.test_prediction_dir,
+                         'performances_run{}.p'.format(run)))
 
     print('All operations finished')
 

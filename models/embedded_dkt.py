@@ -76,7 +76,8 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
             input = self._get_embedding(self.instances_placeholder,
                                         element_embeddings,
                                         positive_embedding)
-        self._build_dropout()
+        self.dropout_placeholder = tf.placeholder_with_default(
+            0.0, shape=(), name='dropout_placeholder')
         if self.dropout_ratio != 0:
             return tf.layers.dropout(inputs=input,
                                      rate=self.dropout_placeholder)
