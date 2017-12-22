@@ -261,7 +261,7 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
     def _build_rnn_cell(self):
         return EmbeddedBasicLSTMCell(self.hidden_layer_size, forget_bias=1.0)
 
-    def _build_recurrent_layer(self, input):
+    def _build_recurrent_layer(self, input_op):
         # The recurrent layer
         rnn_cell = self._build_rnn_cell()
         with tf.name_scope('recurrent_layer') as scope:
@@ -271,7 +271,7 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
             # cell.output_size].
             # State is a Tensor shaped [batch_size, cell.state_size]
             outputs, new_state = tf.nn.dynamic_rnn(
-                rnn_cell, inputs=input,
+                rnn_cell, inputs=input_op,
                 sequence_length=self.lengths_placeholder, scope=scope,
                 initial_state=state_variable)
             # Define the state operations. This wont execute now.
