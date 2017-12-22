@@ -118,7 +118,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             logits: Logits tensor, float - [batch_size, max_num_steps,
                 feature_vector + 1].
         Returns:
-            A scalar float32 tensor with the pearson correlation
+            A scalar float32 tensor with the mean squared error.
         """
         predictions = self._build_predictions(logits)
         # predictions has shape [batch_size, max_num_steps]
@@ -143,7 +143,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         with self.graph.as_default():
             # Reset the metric variables
             stream_vars = [i for i in tf.local_variables()
-                           if i.name.split('/')[0] == 'evaluation_r2']
+                           if i.name.split('/')[0] == 'evaluation_performance']
             mse, mse_update = self.evaluation_op
             self.dataset.reset_batch()
             mse_value = None
