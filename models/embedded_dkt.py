@@ -59,7 +59,23 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
         return tf.add_n([embedded_element, embedded_outcome],
                         name='full_embedding')
 
+    def _pad_batch(self, input_tensor):
+        self.current_batch_size = tf.shape(input_tensor)[0]
+        new_instances = tf.subtract(self.batch_size, tf.shape(input_tensor)[0])
+        # Pad lenghts
+        self.batch_lengths = tf.pad(self.lengths_placeholder,
+                                    paddings=[[tf.constant(0), new_instances]],
+                                    mode='CONSTANT')
+        # Pad instances
+        paddings = [[tf.constant(0), new_instances], tf.constant([0, 0])]
+        input_tensor = tf.pad(input_tensor, paddings=paddings, mode='CONSTANT')
+        # Ensure the correct shape. This is only to avoid an error with the
+        # dynamic_rnn, which needs to know the size of the batch.
+        return tf.reshape(
+            input_tensor, shape=(self.batch_size, self.max_num_steps))
+
     def _build_input_layers(self):
+        input = self._pad_batch(self.instances_placeholder)
         with tf.name_scope('embedding_layer') as scope:
             self.base_embedding = tf.Variable(
                 tf.random_uniform([self.dataset.feature_vector_size,
@@ -73,8 +89,7 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
                 trainable=True, name='positive_embedding')
             positive_embedding = tf.concat([tf.zeros([1, self.embedding_size]),
                                             self.positive_embedding], 0)
-            input = self._get_embedding(self.instances_placeholder,
-                                        element_embeddings,
+            input = self._get_embedding(input, element_embeddings,
                                         positive_embedding)
         self.dropout_placeholder = tf.placeholder_with_default(
             0.0, shape=(), name='dropout_placeholder')
@@ -142,7 +157,7 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
                        off_value=0, axis=-1),
             logits.dtype)
         predictions = tf.multiply(logits, labels_mask)
-        predictions = tf.reduce_max(predictions, axis=2)
+        predictions = tf.reduce_max(predictions, axis=2, name='predictions')
 
         return predictions
 
@@ -156,17 +171,16 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
             batch_true[index] = numpy.append(
                 batch_true[index], labels[index, :length])
 
-    def _build_evaluation(self, logits):
+    def _build_evaluation(self, predictions):
         """Evaluate the quality of the logits at predicting the label.
 
         Args:
-            logits: Logits tensor, float - [batch_size, max_num_steps,
-                embedding_size].
+            predictions: Logits tensor, float - [current_batch_size,
+                                                 max_num_steps].
         Returns:
             Two operations, where the first one gives the value of the
             mean squared error in the validation dataset.
         """
-        predictions = self._build_predictions(logits)
         # predictions has shape [batch_size, max_num_steps]
         with tf.name_scope('evaluation_performance'):
             mask = tf.sequence_mask(
@@ -208,7 +222,7 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
 class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
     """BasicLSTMCell to transform the input before running the cell."""
 
-    def __init__(self, num_units, forget_bias=1.0, input_size=None,
+    def __init__(self, num_units, forget_bias=1.0,
                  state_is_tuple=True, activation=tanh, reuse=None,
                  modifier_function=None):
         super(EmbeddedBasicLSTMCell, self).__init__(
@@ -248,16 +262,10 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
     The embedded layer is combined with the hidden state of the recurrent
     network before entering the hidden layer.
     """
-    def __init__(self, dataset, name=None, hidden_layer_size=0, batch_size=None,
-                 logs_dirname='.', log_values=True,
-                 max_num_steps=30, embedding_size=200, dropout_ratio=0.3,
-                 **kwargs):
+    def __init__(self, dataset, hidden_layer_size=200, **kwargs):
         super(CoEmbeddedSeqLSTMModel, self).__init__(
-            dataset, batch_size=batch_size,
-            logs_dirname=logs_dirname, name=name, log_values=log_values,
-            dropout_ratio=dropout_ratio, hidden_layer_size=hidden_layer_size,
-            max_num_steps=max_num_steps, embedding_size=embedding_size,
-            **kwargs)
+            dataset, hidden_layer_size=hidden_layer_size,
+            embedding_size=hidden_layer_size, **kwargs)
 
     def _build_rnn_cell(self):
         return EmbeddedBasicLSTMCell(self.hidden_layer_size, forget_bias=1.0)
@@ -273,7 +281,7 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
             # State is a Tensor shaped [batch_size, cell.state_size]
             outputs, new_state = tf.nn.dynamic_rnn(
                 rnn_cell, inputs=input_op,
-                sequence_length=self.lengths_placeholder, scope=scope,
+                sequence_length=self.batch_lengths, scope=scope,
                 initial_state=state_variable)
             # Define the state operations. This wont execute now.
             self.last_state_op = self._get_state_update_op(state_variable,

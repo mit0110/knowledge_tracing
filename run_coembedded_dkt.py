@@ -47,7 +47,6 @@ def read_configuration(args):
         'batch_size': args.batch_size,
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
-        'embedding_size': args.hidden_layer_size,
         'dropout_ratio': args.dropout_ratio
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
