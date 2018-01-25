@@ -38,6 +38,9 @@ def parse_arguments():
     parser.add_argument('--dropout_ratio', type=float, default=0.3,
                         help='Dropout for the input layer and the recurrent '
                              'layer.')
+    parser.add_argument('--use_prev_state', action='store_true',
+                        help='Use the ending previous state when processing '
+                             'the same instance.')
     return parser.parse_args()
 
 
@@ -47,7 +50,8 @@ def read_configuration(args):
         'batch_size': args.batch_size,
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
-        'dropout_ratio': args.dropout_ratio
+        'dropout_ratio': args.dropout_ratio,
+        'use_prev_state': args.use_prev_state,
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config

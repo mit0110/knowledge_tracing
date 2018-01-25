@@ -134,6 +134,10 @@ class EmbeddedSeqLSTMModelTest(unittest.TestCase):
         with self.assertRaises(StopIteration):
             next(batch_iterator)
 
+    def test_no_prev_state(self):
+        self.model.use_prev_state = False
+        self.model.fit(close_session=True, training_epochs=50)
+
 
 class CoEmbeddedSeqLSTMModelTest(EmbeddedSeqLSTMModelTest):
     """Tests for building and running a SeqPredictionModel instance"""

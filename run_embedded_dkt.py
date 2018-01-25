@@ -38,6 +38,9 @@ def parse_arguments():
     parser.add_argument('--runs', type=int, default=1,
                         help='Number of times to run the experiment with'
                              'different samples')
+    parser.add_argument('--use_prev_state', action='store_true',
+                        help='Use the ending previous state when processing '
+                             'the same instance.')
     return parser.parse_args()
 
 
@@ -48,7 +51,8 @@ def read_configuration(args):
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
         'embedding_size': args.embedding_size,
-        'dropout_ratio': args.dropout_ratio
+        'dropout_ratio': args.dropout_ratio,
+        'use_prev_state': args.use_prev_state,
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config
