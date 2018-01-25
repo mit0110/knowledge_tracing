@@ -1,5 +1,6 @@
 import argparse
 import os
+import tensorflow as tf
 import utils
 
 from models import embedded_dkt
@@ -57,29 +58,40 @@ def main():
     sequences, labels = utils.pickle_from_file(args.filename)
     experiment_config, partitions = read_configuration(args)
     print('Creating samples')
+
     assistment_dataset.create_samples(
-        sequences, labels, partition_sizes=partitions, samples_num=1,
+        sequences, labels, partition_sizes=partitions, samples_num=args.runs,
         sort_by_length=False)
 
-    assistment_dataset.set_current_sample(0)
+    for run in range(args.runs):
+        print('Running iteration {} of {}'.format(run + 1, args.runs))
+        assistment_dataset.set_current_sample(run)
 
-    print('Dataset Configuration')
-    print(partitions)
-    print('Experiment Configuration')
-    print(experiment_config)
-    model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
-                                              **experiment_config)
-    model.fit(partition_name='train', close_session=False,
-              training_epochs=args.training_epochs)
-    if args.embedding_metadata is not None:
-        model.write_embeddings(args.embedding_metadata)
-    predicted_labels = model.predict('test')
-    utils.pickle_to_file(
-        predicted_labels,
-        os.path.join(args.test_predictions_filename, 'predictions.p'))
-    utils.pickle_to_file(
-        (model.training_performance, model.validation_performance),
-        os.path.join(args.test_predictions_filename, 'performances.p'))
+        print('Dataset Configuration')
+        print(partitions)
+        print('Experiment Configuration')
+        print(experiment_config)
+        if args.base_logs_dirname:
+            tf.reset_default_graph()
+            logs_dirname = os.path.join(
+                args.base_logs_dirname, 'run{}'.format(run))
+            utils.safe_mkdir(logs_dirname)
+            experiment_config['logs_dirname'] = logs_dirname
+
+        model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
+                                                  **experiment_config)
+        model.fit(partition_name='train', close_session=False,
+                  training_epochs=args.training_epochs)
+
+        if args.embedding_metadata is not None:
+            model.write_embeddings(args.embedding_metadata)
+        predicted_labels = model.predict('test')
+        utils.pickle_to_file(
+            predicted_labels,
+            os.path.join(args.test_predictions_filename, 'predictions.p'))
+        utils.pickle_to_file(
+            (model.training_performance, model.validation_performance),
+            os.path.join(args.test_predictions_filename, 'performances.p'))
 
 
 if __name__ == '__main__':
