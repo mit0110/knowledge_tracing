@@ -9,7 +9,7 @@ from quick_experiment import dataset
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--logs_dirname', type=str, default=None,
+    parser.add_argument('--base_logs_dirname', type=str, default=None,
                         help='Path to directory to store tensorboard info')
     parser.add_argument('--filename', type=str,
                         help='The path to the pickled file with the processed'
@@ -35,6 +35,9 @@ def parse_arguments():
     parser.add_argument('--dropout_ratio', type=float, default=0.3,
                         help='Dropout for the input layer and the recurrent '
                              'layer.')
+    parser.add_argument('--runs', type=int, default=1,
+                        help='Number of times to run the experiment with'
+                             'different samples')
     return parser.parse_args()
 
 
@@ -42,7 +45,6 @@ def read_configuration(args):
     config = {
         'hidden_layer_size': args.hidden_layer_size,
         'batch_size': args.batch_size,
-        'logs_dirname': args.logs_dirname,
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
         'embedding_size': args.embedding_size,
