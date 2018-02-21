@@ -13,16 +13,12 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
     Predicts the probability of the next element on the sequence. The
     input is first passed by an embedding layer to reduce dimensionality.
     """
-    def __init__(self, dataset, name=None, hidden_layer_size=0, batch_size=None,
-                 logs_dirname='.', log_values=True,
-                 max_num_steps=30, embedding_size=200, dropout_ratio=0.3,
-                 **kwargs):
-        super(EmbeddedSeqLSTMModel, self).__init__(
-            dataset, batch_size=batch_size,
-            logs_dirname=logs_dirname, name=name, log_values=log_values,
-            dropout_ratio=dropout_ratio, hidden_layer_size=hidden_layer_size,
-            max_num_steps=max_num_steps, **kwargs)
+    def __init__(self, dataset, embedding_size=200, embedding_model=None,
+                 finetune_embeddings=True, **kwargs):
+        super(EmbeddedSeqLSTMModel, self).__init__(dataset, **kwargs)
         self.embedding_size = embedding_size
+        self.embedding_model = embedding_model
+        self.finetune_embeddings = finetune_embeddings
 
     def _build_inputs(self):
         """Generate placeholder variables to represent the input tensors.
@@ -42,22 +38,8 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
             tf.int32, (None, self.max_num_steps),
             name='labels_placeholder')
 
-    def _get_embedding(self, element_ids, element_embeddings,
-                       positive_embedding, element_only=False):
-        """Returns self.element_embeddings + self.positive_embeddings if
-        the element is positive, and self.element_embedding is is negative."""
-        embedded_element = tf.nn.embedding_lookup(
-            element_embeddings, tf.abs(element_ids), name='embedded_element')
-        if element_only:
-            return embedded_element
-        embedded_outcome = tf.nn.embedding_lookup(
-            positive_embedding,
-            tf.clip_by_value(element_ids, clip_value_min=0,
-                             clip_value_max=self.dataset.feature_vector_size),
-            name='embedded_outcome')
-
-        return tf.add_n([embedded_element, embedded_outcome],
-                        name='full_embedding')
+        self.dropout_placeholder = tf.placeholder_with_default(
+            0.0, shape=(), name='dropout_placeholder')
 
     def _pad_batch(self, input_tensor):
         self.current_batch_size = tf.shape(input_tensor)[0]
@@ -74,29 +56,68 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
         return tf.reshape(
             input_tensor, shape=(self.batch_size, self.max_num_steps))
 
+    def _get_embedding(self, element_ids, element_embeddings,
+                       positive_embedding, element_only=False):
+        """Returns self.element_embeddings + self.positive_embeddings if
+        the element is positive, and self.element_embedding is is negative."""
+        embedded_element = tf.nn.embedding_lookup(
+            element_embeddings, tf.abs(element_ids), name='embedded_element')
+        if element_only:
+            return embedded_element
+        embedded_outcome = tf.nn.embedding_lookup(
+            positive_embedding,
+            tf.clip_by_value(element_ids, clip_value_min=0,
+                             clip_value_max=self.dataset.feature_vector_size),
+            name='embedded_outcome')
+        return tf.add_n([embedded_element, embedded_outcome],
+                        name='full_embedding')
+
     def _build_input_layers(self):
         input = self._pad_batch(self.instances_placeholder)
-        with tf.name_scope('embedding_layer') as scope:
+        if self.embedding_model is not None:
+            embedding_matrix = self.embedding_model.wv.syn0
+            # https://github.com/dennybritz/cnn-text-classification-tf/issues/17
+            self.embedding_placeholder = tf.placeholder_with_default(
+                embedding_matrix, shape=embedding_matrix.shape,
+                name='embedding_placeholder')
+            self.base_embedding = tf.Variable(tf.random_uniform(
+                embedding_matrix.shape, -1.0, 1.0),
+                name='input_embedding_var', trainable=self.finetune_embeddings)
+            self.embedding_init = self.base_embedding.assign(
+                self.embedding_placeholder)
+            # We add the embedding for the zero element, which SHOULD be the
+            # padding element, and the embedding for the OOV element.
+            element_embeddings = tf.concat([
+                tf.zeros([1, self.embedding_size]),
+                self.base_embedding,
+                tf.random_uniform([1, self.embedding_size], -1.0, 1.0)
+            ], 0)
+        else:
             self.base_embedding = tf.Variable(
                 tf.random_uniform([self.dataset.feature_vector_size,
                                    self.embedding_size], 0, 1.0),
                 trainable=True, name='base_embedding')
             element_embeddings = tf.concat([
                 tf.zeros([1, self.embedding_size]), self.base_embedding], 0)
-            self.positive_embedding = tf.Variable(
-                tf.random_uniform([self.dataset.feature_vector_size,
-                                   self.embedding_size], 0, 1.0),
-                trainable=True, name='positive_embedding')
-            positive_embedding = tf.concat([tf.zeros([1, self.embedding_size]),
-                                            self.positive_embedding], 0)
-            input = self._get_embedding(input, element_embeddings,
-                                        positive_embedding)
-        self.dropout_placeholder = tf.placeholder_with_default(
-            0.0, shape=(), name='dropout_placeholder')
+        self.positive_embedding = tf.Variable(
+            tf.random_uniform([self.dataset.feature_vector_size,
+                               self.embedding_size], 0, 1.0),
+            trainable=True, name='positive_embedding')
+        positive_embedding = tf.concat([tf.zeros([1, self.embedding_size]),
+                                        self.positive_embedding], 0)
+        input = self._get_embedding(input, element_embeddings,
+                                    positive_embedding)
+
         if self.dropout_ratio != 0:
             return tf.layers.dropout(inputs=input,
                                      rate=self.dropout_placeholder)
         return input
+
+    def build_all(self):
+        super(EmbeddedSeqLSTMModel, self).build_all()
+        if self.embedding_model is not None:
+            with self.graph.as_default():
+                self.sess.run([self.embedding_init])
 
     def _build_loss(self, logits):
         """Calculates the average binary cross entropy.
@@ -248,8 +269,10 @@ class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
             c, h = state
         else:
             raise ValueError('EmbeddedBasicLSTMCell must use a state tuple')
-        # TODO if self.modifier_function is not None:
-        inputs = tf.abs(tf.subtract(inputs, h))
+        if self.modifier_function is not None:
+            inputs = self.modifier_function(inputs, h)
+        else:
+            inputs = tf.abs(tf.subtract(inputs, h))
         return super(EmbeddedBasicLSTMCell, self).call(inputs, state)
 
 
@@ -290,3 +313,20 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
                 state_variable,
                 rnn_cell.zero_state(self.batch_size, tf.float32))
         return outputs
+
+
+class CoEmbeddedSeqLSTMModel2(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer. The embedding_size will be the
+    same as the hidden layer size.
+    """
+
+    def _build_rnn_cell(self):
+        return EmbeddedBasicLSTMCell(
+            self.hidden_layer_size, forget_bias=1.0,
+            modifier_function=lambda i, h: tf.square(tf.subtract(i, h)))

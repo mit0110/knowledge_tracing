@@ -41,6 +41,8 @@ def parse_arguments():
     parser.add_argument('--use_prev_state', action='store_true',
                         help='Use the ending previous state when processing '
                              'the same instance.')
+    parser.add_argument('--nofinetune', action='store_true',
+                        help='Do no change the pretrained embedding.')
     parser.add_argument('--embedding_model', type=str, default=None,
                         help='Path to word2vec model to use as pretrained '
                              'embeddings.')
@@ -56,6 +58,7 @@ def read_configuration(args):
         'embedding_size': args.embedding_size,
         'dropout_ratio': args.dropout_ratio,
         'use_prev_state': args.use_prev_state,
+        'finetune_embeddings': not args.nofinetune,
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config
@@ -76,8 +79,7 @@ def main():
     print('Creating samples')
 
     dataset.create_samples(
-        sequences, labels, partition_sizes=partitions, samples_num=args.runs,
-        sort_by_length=False)
+        sequences, labels, partition_sizes=partitions, samples_num=args.runs)
 
     for run in range(args.runs):
         print('Running iteration {} of {}'.format(run + 1, args.runs))
@@ -94,7 +96,8 @@ def main():
             utils.safe_mkdir(logs_dirname)
             experiment_config['logs_dirname'] = logs_dirname
 
-        model = embedded_dkt.EmbeddedSeqLSTMModel(dataset, **experiment_config)
+        model = embedded_dkt.EmbeddedSeqLSTMModel(
+            dataset, embedding_model=embedding_model, **experiment_config)
         model.fit(partition_name='train', close_session=False,
                   training_epochs=args.training_epochs)
 

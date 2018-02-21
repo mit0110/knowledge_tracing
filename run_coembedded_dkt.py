@@ -1,12 +1,12 @@
 import argparse
 import os
-import json
 import utils
 import tensorflow as tf
 
-from models import embedded_dkt
-from quick_experiment import dataset
+from gensim.models import Word2Vec
 
+from models import embedded_dkt
+import assistment_dataset
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -41,7 +41,22 @@ def parse_arguments():
     parser.add_argument('--use_prev_state', action='store_true',
                         help='Use the ending previous state when processing '
                              'the same instance.')
+    parser.add_argument('--nofinetune', action='store_true',
+                        help='Do no change the pretrained embedding.')
+    parser.add_argument('--model', type=str, default='abs',
+                        help='Name of the model to run. The variation is in the'
+                             'difference function between co-embeddings. '
+                             'Possible values are abs and square.')
+    parser.add_argument('--embedding_model', type=str, default=None,
+                        help='Path to word2vec model to use as pretrained '
+                             'embeddings.')
     return parser.parse_args()
+
+
+MODELS = {
+    'abs': embedded_dkt.CoEmbeddedSeqLSTMModel,
+    'square': embedded_dkt.CoEmbeddedSeqLSTMModel2,
+}
 
 
 def read_configuration(args):
@@ -52,14 +67,22 @@ def read_configuration(args):
         'max_num_steps': args.max_num_steps,
         'dropout_ratio': args.dropout_ratio,
         'use_prev_state': args.use_prev_state,
+        'finetune_embeddings': not args.nofinetune,
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config
 
 
+def read_embedding_model(model_path):
+    if model_path is None:
+        return None
+    return Word2Vec.load(model_path)
+
+
 def main():
     args = parse_arguments()
-    assistment_dataset = dataset.EmbeddedSequenceDataset()
+    embedding_model = read_embedding_model(args.embedding_model)
+    dataset = assistment_dataset.AssistmentDataset(embedding_model)
     sequences, labels = utils.pickle_from_file(args.filename)
 
     print('Experiment Configuration')
@@ -67,9 +90,8 @@ def main():
     print(experiment_config)
 
     print('Creating samples')
-    assistment_dataset.create_samples(
-        sequences, labels, partition_sizes=partitions, samples_num=args.runs,
-        sort_by_length=True)
+    dataset.create_samples(
+        sequences, labels, partition_sizes=partitions, samples_num=args.runs)
     print('Dataset Configuration')
     print(partitions)
 
@@ -80,15 +102,15 @@ def main():
 
     for run in range(args.runs):
         print('Running iteration {} of {}'.format(run + 1, args.runs))
-        assistment_dataset.set_current_sample(run)
+        dataset.set_current_sample(run)
         if args.base_logs_dirname:
             tf.reset_default_graph()
             logs_dirname = os.path.join(args.base_logs_dirname,
                                         'run{}'.format(run))
             utils.safe_mkdir(logs_dirname)
             experiment_config['logs_dirname'] = logs_dirname
-        model = embedded_dkt.CoEmbeddedSeqLSTMModel(assistment_dataset,
-                                                    **experiment_config)
+        model = MODELS[args.model](
+            dataset, embedding_model=embedding_model, **experiment_config)
         model.fit(partition_name='train',
                   training_epochs=args.training_epochs,
                   close_session=False)
@@ -106,6 +128,7 @@ def main():
                          'performances_run{}.p'.format(run)))
 
     print('All operations finished')
+
 
 if __name__ == '__main__':
     main()
