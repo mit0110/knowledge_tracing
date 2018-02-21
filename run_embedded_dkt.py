@@ -69,7 +69,8 @@ def read_embedding_model(model_path):
 
 def main():
     args = parse_arguments()
-    dataset = assistment_dataset.AssistmentDataset()
+    embedding_model = read_embedding_model(args.embedding_model)
+    dataset = assistment_dataset.AssistmentDataset(embedding_model)
     sequences, labels = utils.pickle_from_file(args.filename)
     experiment_config, partitions = read_configuration(args)
     print('Creating samples')

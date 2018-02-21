@@ -38,13 +38,9 @@ class AssistmentDataset(dataset.EmbeddedSequenceDataset):
         }
         # We have to add one to the result because the 0 embedding is for the
         # padded element of the sequence.
-        map_function = numpy.vectorize(
-            lambda x: word2index.get(str(x), len(word2index)) + 1)
-        import ipdb; ipdb.set_trace()
+        map_function = numpy.vectorize(lambda x: (word2index.get(
+            str(numpy.abs(x)), len(word2index)) + 1) * numpy.sign(x))
         self._instances = numpy.array([
             map_function(sequence) for sequence in self._instances
         ])
 
-        self._labels = numpy.array([
-            map_function(sequence) for sequence in self._labels
-        ])
