@@ -3,9 +3,9 @@ import os
 import tensorflow as tf
 import utils
 
+import assistment_dataset
 from models import embedded_dkt
-from quick_experiment import dataset
-
+from gensim.models import Word2Vec
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -41,6 +41,9 @@ def parse_arguments():
     parser.add_argument('--use_prev_state', action='store_true',
                         help='Use the ending previous state when processing '
                              'the same instance.')
+    parser.add_argument('--embedding_model', type=str, default=None,
+                        help='Path to word2vec model to use as pretrained '
+                             'embeddings.')
     return parser.parse_args()
 
 
@@ -58,20 +61,26 @@ def read_configuration(args):
     return config, dataset_config
 
 
+def read_embedding_model(model_path):
+    if model_path is None:
+        return None
+    return Word2Vec.load(model_path)
+
+
 def main():
     args = parse_arguments()
-    assistment_dataset = dataset.EmbeddedSequenceDataset()
+    dataset = assistment_dataset.AssistmentDataset()
     sequences, labels = utils.pickle_from_file(args.filename)
     experiment_config, partitions = read_configuration(args)
     print('Creating samples')
 
-    assistment_dataset.create_samples(
+    dataset.create_samples(
         sequences, labels, partition_sizes=partitions, samples_num=args.runs,
         sort_by_length=False)
 
     for run in range(args.runs):
         print('Running iteration {} of {}'.format(run + 1, args.runs))
-        assistment_dataset.set_current_sample(run)
+        dataset.set_current_sample(run)
 
         print('Dataset Configuration')
         print(partitions)
@@ -84,8 +93,7 @@ def main():
             utils.safe_mkdir(logs_dirname)
             experiment_config['logs_dirname'] = logs_dirname
 
-        model = embedded_dkt.EmbeddedSeqLSTMModel(assistment_dataset,
-                                                  **experiment_config)
+        model = embedded_dkt.EmbeddedSeqLSTMModel(dataset, **experiment_config)
         model.fit(partition_name='train', close_session=False,
                   training_epochs=args.training_epochs)
 

@@ -100,7 +100,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         """
         predictions = []
         true = []
-        self.dataset.reset_batch()
+        self.dataset.reset_batch(partition_name)
         with self.graph.as_default():
             while (self.dataset.has_next_batch(self.batch_size, partition_name)
                    and (limit <= 0 or len(predictions) < limit)):
@@ -145,7 +145,7 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
             stream_vars = [i for i in tf.local_variables()
                            if i.name.split('/')[0] == 'evaluation_performance']
             mse, mse_update = self.evaluation_op
-            self.dataset.reset_batch()
+            self.dataset.reset_batch(partition)
             mse_value = None
             self.sess.run([tf.variables_initializer(stream_vars)])
             while self.dataset.has_next_batch(self.batch_size, partition):
