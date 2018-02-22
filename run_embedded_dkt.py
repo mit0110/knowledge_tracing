@@ -104,12 +104,12 @@ def main():
         if args.embedding_metadata is not None:
             model.write_embeddings(args.embedding_metadata)
         predicted_labels = model.predict('test')
-        utils.pickle_to_file(
-            predicted_labels,
-            os.path.join(args.test_predictions_filename, 'predictions.p'))
+        utils.pickle_to_file(predicted_labels, os.path.join(
+            args.test_predictions_filename, 'predictions_run{}.p'.format(run)))
         utils.pickle_to_file(
             (model.training_performance, model.validation_performance),
-            os.path.join(args.test_predictions_filename, 'performances.p'))
+            os.path.join(args.test_predictions_filename,
+                         'performances_run{}.p'.format(run)))
 
 
 if __name__ == '__main__':
