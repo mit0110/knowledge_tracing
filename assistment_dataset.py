@@ -28,10 +28,11 @@ class AssistmentDataset(dataset.EmbeddedSequenceDataset):
         """
         super(AssistmentDataset, self).create_samples(
             instances, labels, samples_num, partition_sizes, use_numeric_labels)
-
         self._fit_embedding_vocabulary()
 
     def _fit_embedding_vocabulary(self):
+        if self._embedding_model is None:
+            return
         word2index = {
             word: index
             for index, word in enumerate(self._embedding_model.wv.index2word)
