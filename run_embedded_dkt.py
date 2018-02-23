@@ -52,6 +52,8 @@ def parse_arguments():
     parser.add_argument('--embedding_model', type=str, default=None,
                         help='Path to word2vec model to use as pretrained '
                              'embeddings.')
+    parser.add_argument('--learning_rate', type=float, default=0.001,
+                        help='Learning rate.')
     parser.add_argument('--log_gradients', action='store_true',
                         help='Log gradients and learning rate.')
     return parser.parse_args()
@@ -75,6 +77,7 @@ def read_configuration(args):
         'use_prev_state': args.use_prev_state,
         'finetune_embeddings': not args.nofinetune,
         'log_gradients': args.log_gradients,
+        'learning_rate': args.learning_rate,
     }
     dataset_config = {'train': 0.7, 'test': 0.2, 'validation': 0.1}
     return config, dataset_config
