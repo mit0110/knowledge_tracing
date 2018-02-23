@@ -331,3 +331,37 @@ class CoEmbeddedSeqLSTMModel2(CoEmbeddedSeqLSTMModel):
         return EmbeddedBasicLSTMCell(
             self.hidden_layer_size, forget_bias=1.0,
             modifier_function=lambda i, h: tf.square(tf.subtract(i, h)))
+
+
+class EmbeddedBasicRNNCell(tf.contrib.rnn.BasicRNNCell):
+    """BasicLSTMCell to transform the input before running the cell."""
+
+    def __init__(self, num_units, forget_bias=1.0,
+                 state_is_tuple=True, activation=tanh, reuse=None,
+                 modifier_function=None):
+        super(EmbeddedBasicRNNCell, self).__init__(
+            num_units, forget_bias=forget_bias, state_is_tuple=state_is_tuple,
+            activation=activation, reuse=reuse)
+        self.modifier_function = modifier_function
+
+    def call(self, inputs, state):
+        if self.modifier_function is not None:
+            inputs = self.modifier_function(inputs, state)
+        else:
+            inputs = tf.abs(tf.subtract(inputs, state))
+        return super(EmbeddedBasicRNNCell, self).call(inputs, state)
+
+
+class CoEmbeddedSeqRNNModel(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer. The embedding_size will be the
+    same as the hidden layer size.
+    """
+
+    def _build_rnn_cell(self):
+        return EmbeddedBasicRNNCell(self.hidden_layer_size)

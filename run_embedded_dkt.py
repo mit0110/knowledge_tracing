@@ -62,6 +62,7 @@ def parse_arguments():
 MODELS = {
     'co-abs': embedded_dkt.CoEmbeddedSeqLSTMModel,
     'co-square': embedded_dkt.CoEmbeddedSeqLSTMModel2,
+    'co-abs-rnn': embedded_dkt.CoEmbeddedSeqRNNModel,
     'e-lstm': embedded_dkt.EmbeddedSeqLSTMModel,
 }
 
