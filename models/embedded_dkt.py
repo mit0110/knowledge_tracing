@@ -240,15 +240,25 @@ class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
             projector.visualize_embeddings(self.summary_writer, config)
 
 
+class EmbeddedSeqGRUModel(EmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with GRU cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer.
+    """
+    def _build_rnn_cell(self):
+        return tf.contrib.rnn.GRUCell(self.hidden_layer_size)
+
+
 class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
     """BasicLSTMCell to transform the input before running the cell."""
 
-    def __init__(self, num_units, forget_bias=1.0,
-                 state_is_tuple=True, activation=tanh, reuse=None,
-                 modifier_function=None):
+    def __init__(self, num_units, *args, modifier_function=None, **kwargs):
         super(EmbeddedBasicLSTMCell, self).__init__(
-            num_units, forget_bias=forget_bias, state_is_tuple=state_is_tuple,
-            activation=activation, reuse=reuse)
+            num_units, num_units, *args, **kwargs)
         self.modifier_function = modifier_function
 
     def call(self, inputs, state):
@@ -294,27 +304,6 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
     def _build_rnn_cell(self):
         return EmbeddedBasicLSTMCell(self.hidden_layer_size, forget_bias=1.0)
 
-    def _build_recurrent_layer(self, input_op):
-        # The recurrent layer
-        rnn_cell = self._build_rnn_cell()
-        with tf.name_scope('recurrent_layer') as scope:
-            # Get the initial state. States will be a LSTMStateTuples.
-            state_variable = self._build_state_variables(rnn_cell)
-            # outputs is a Tensor shaped [batch_size, max_time,
-            # cell.output_size].
-            # State is a Tensor shaped [batch_size, cell.state_size]
-            outputs, new_state = tf.nn.dynamic_rnn(
-                rnn_cell, inputs=input_op,
-                sequence_length=self.batch_lengths, scope=scope,
-                initial_state=state_variable)
-            # Define the state operations. This wont execute now.
-            self.last_state_op = self._get_state_update_op(state_variable,
-                                                           new_state)
-            self.reset_state_op = self._get_state_update_op(
-                state_variable,
-                rnn_cell.zero_state(self.batch_size, tf.float32))
-        return outputs
-
 
 class CoEmbeddedSeqLSTMModel2(CoEmbeddedSeqLSTMModel):
     """A Recurrent Neural Network model with LSTM cells.
@@ -333,15 +322,40 @@ class CoEmbeddedSeqLSTMModel2(CoEmbeddedSeqLSTMModel):
             modifier_function=lambda i, h: tf.square(tf.subtract(i, h)))
 
 
+class EmbeddedBasicGRUCell(tf.contrib.rnn.GRUCell):
+    """BasicLSTMCell to transform the input before running the cell."""
+
+    def __init__(self, num_units, *args, modifier_function=None, **kwargs):
+        super(EmbeddedBasicGRUCell, self).__init__(
+            num_units, *args, **kwargs)
+        self.modifier_function = modifier_function
+
+    def call(self, inputs, state):
+        if self.modifier_function is not None:
+            inputs = self.modifier_function(inputs, state)
+        else:
+            inputs = tf.abs(tf.subtract(inputs, state))
+        return super(EmbeddedBasicGRUCell, self).call(inputs, state)
+
+
+class CoEmbeddedSeqGRUModel(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with GRU cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer.
+    """
+    def _build_rnn_cell(self):
+        return EmbeddedBasicGRUCell(self.hidden_layer_size)
+
+
 class EmbeddedBasicRNNCell(tf.contrib.rnn.BasicRNNCell):
     """BasicLSTMCell to transform the input before running the cell."""
 
-    def __init__(self, num_units, forget_bias=1.0,
-                 state_is_tuple=True, activation=tanh, reuse=None,
-                 modifier_function=None):
-        super(EmbeddedBasicRNNCell, self).__init__(
-            num_units, forget_bias=forget_bias, state_is_tuple=state_is_tuple,
-            activation=activation, reuse=reuse)
+    def __init__(self, num_units, *args, modifier_function=None, **kwargs):
+        super(EmbeddedBasicRNNCell, self).__init__(num_units, *args, **kwargs)
         self.modifier_function = modifier_function
 
     def call(self, inputs, state):

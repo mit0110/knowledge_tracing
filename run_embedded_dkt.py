@@ -64,6 +64,7 @@ MODELS = {
     'co-square': embedded_dkt.CoEmbeddedSeqLSTMModel2,
     'co-abs-rnn': embedded_dkt.CoEmbeddedSeqRNNModel,
     'e-lstm': embedded_dkt.EmbeddedSeqLSTMModel,
+    'e-gru': embedded_dkt.EmbeddedSeqGRUModel
 }
 
 
