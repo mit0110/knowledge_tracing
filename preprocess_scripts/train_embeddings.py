@@ -30,7 +30,6 @@ def main():
     args = parse_arguments()
     with open(args.input_filename, 'rb') as sequence_file:
         raw_sequences, _ = pickle.load(sequence_file)
-    import ipdb; ipdb.set_trace()
     # Use only first and second elements
     sequences = [numpy.abs(sequence).astype(numpy.str).tolist()
                  for sequence in raw_sequences]

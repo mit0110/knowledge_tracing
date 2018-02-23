@@ -286,6 +286,7 @@ class CoEmbeddedSeqLSTMModel(EmbeddedSeqLSTMModel):
     network before entering the hidden layer.
     """
     def __init__(self, dataset, hidden_layer_size=200, **kwargs):
+        kwargs.pop('embedding_size')
         super(CoEmbeddedSeqLSTMModel, self).__init__(
             dataset, hidden_layer_size=hidden_layer_size,
             embedding_size=hidden_layer_size, **kwargs)
