@@ -27,14 +27,14 @@ def main():
     filtered_dataset = dataset.groupby(PROBLEM_ID_COLUMN).filter(
         lambda x: len(x) >= args.min_frequency)
 
-    print 'New dataset shape {}'.format(filtered_dataset.shape)
-    print 'Discarded rows {}'.format(
-        dataset.shape[0] - filtered_dataset.shape[0])
-    print 'New number of unique problems {}'.format(
-        filtered_dataset.problem_id.unique().shape)
+    print('New dataset shape {}'.format(filtered_dataset.shape))
+    print('Discarded rows {}'.format(
+        dataset.shape[0] - filtered_dataset.shape[0]))
+    print('New number of unique problems {}'.format(
+        filtered_dataset.problem_id.unique().shape))
 
     filtered_dataset.to_csv(args.output_filename)
-    print 'All operations completed'
+    print('All operations completed')
 
 
 if __name__ == '__main__':

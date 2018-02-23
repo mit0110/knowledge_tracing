@@ -62,7 +62,7 @@ class ProblemEncoder(object):
                 self.encoding[value] = self.last_id
                 self.values.append(value)
                 self._last_id += 1
-        print '{} different problems found'.format(self.last_id)
+        print('{} different problems found'.format(self.last_id))
 
     def encode(self, sequence):
         encoded_sequence = []
