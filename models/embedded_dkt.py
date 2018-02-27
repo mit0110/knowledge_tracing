@@ -322,6 +322,32 @@ class CoEmbeddedSeqLSTMModel2(CoEmbeddedSeqLSTMModel):
             modifier_function=lambda i, h: tf.square(tf.subtract(i, h)))
 
 
+class CoEmbeddedSeqLSTMModel3(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer. The embedding_size will be the
+    same as the hidden layer size.
+    """
+
+    def _build_rnn_cell(self):
+        # We define a new variable for the standard deviation of the normal
+        # distribution
+        std_var = tf.Variable(1.0, name='normal_std', trainable=True)
+        tf.summary.scalar('normal_std', std_var)
+        dist = tf.distributions.Normal(loc=0.0, scale=std_var)
+
+        def modifier_function(input, state):
+            return dist.prob(tf.subtract(input, state))
+
+        return EmbeddedBasicLSTMCell(
+            self.hidden_layer_size, forget_bias=1.0,
+            modifier_function=modifier_function)
+
+
 class EmbeddedBasicGRUCell(tf.contrib.rnn.GRUCell):
     """BasicLSTMCell to transform the input before running the cell."""
 
