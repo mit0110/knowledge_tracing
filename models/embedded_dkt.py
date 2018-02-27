@@ -270,7 +270,7 @@ class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
 
     def __init__(self, num_units, *args, modifier_function=None, **kwargs):
         super(EmbeddedBasicLSTMCell, self).__init__(
-            num_units, num_units, *args, **kwargs)
+            num_units, *args, **kwargs)
         self.modifier_function = modifier_function
 
     def call(self, inputs, state):

@@ -66,6 +66,7 @@ MODELS = {
     'e-lstm': embedded_dkt.EmbeddedSeqLSTMModel,
     'e-gru': embedded_dkt.EmbeddedSeqGRUModel,
     'co-abs-gru': embedded_dkt.CoEmbeddedSeqGRUModel,
+    'co-norm': embedded_dkt.CoEmbeddedSeqLSTMModel3,
 }
 
 
