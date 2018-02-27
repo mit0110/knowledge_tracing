@@ -38,7 +38,7 @@ def parse_arguments():
     parser.add_argument('--dropout_ratio', type=float, default=0.3,
                         help='Dropout for the input layer and the recurrent '
                              'layer.')
-    parser.add_argument('--embedding_size', type=int, default=100,
+    parser.add_argument('--embedding_size', type=int, default=None,
                         help='Number of units in the embedding layer.')
     parser.add_argument('--use_prev_state', action='store_true',
                         help='Use the ending previous state when processing '
@@ -65,8 +65,10 @@ MODELS = {
     'co-abs-rnn': embedded_dkt.CoEmbeddedSeqRNNModel,
     'e-lstm': embedded_dkt.EmbeddedSeqLSTMModel,
     'e-gru': embedded_dkt.EmbeddedSeqGRUModel,
+    'e-rnn': embedded_dkt.EmbeddedSeqRNNModel,
     'co-abs-gru': embedded_dkt.CoEmbeddedSeqGRUModel,
     'co-norm': embedded_dkt.CoEmbeddedSeqLSTMModel3,
+    'co-norm-fixed': embedded_dkt.CoEmbeddedSeqLSTMModel4,
 }
 
 

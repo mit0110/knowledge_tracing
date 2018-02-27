@@ -265,6 +265,19 @@ class EmbeddedSeqGRUModel(EmbeddedSeqLSTMModel):
         return state_variables.assign(new_state)
 
 
+class EmbeddedSeqRNNModel(EmbeddedSeqGRUModel):
+    """A Recurrent Neural Network model with GRU cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer.
+    """
+    def _build_rnn_cell(self):
+        return tf.contrib.rnn.BasicRNNCell(self.hidden_layer_size)
+
+
 class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
     """BasicLSTMCell to transform the input before running the cell."""
 
@@ -358,6 +371,29 @@ class CoEmbeddedSeqLSTMModel3(CoEmbeddedSeqLSTMModel):
         return EmbeddedBasicLSTMCell(
             self.hidden_layer_size, forget_bias=1.0,
             modifier_function=modifier_function)
+
+
+class CoEmbeddedSeqLSTMModel4(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer. The embedding_size will be the
+    same as the hidden layer size.
+    """
+
+    def _build_rnn_cell(self):
+        # We define a new variable for the standard deviation of the normal
+        # distribution
+        dist = tf.distributions.Normal(loc=0.0, scale=2.0)
+
+        def modifier_function(input, state):
+            return dist.prob(tf.subtract(input, state))
+
+        return EmbeddedBasicLSTMCell(
+            self.hidden_layer_size, modifier_function=modifier_function)
 
 
 class EmbeddedBasicGRUCell(tf.contrib.rnn.GRUCell):
