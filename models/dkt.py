@@ -58,33 +58,14 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         predictions = tf.reduce_max(predictions, axis=2)
         return predictions
 
-    def _get_batch_prediction(self, partition_name):
-        true = []
-        predictions = []
-        lengths = numpy.zeros(self.batch_size)
-        for feed_dict in self._fill_feed_dict(partition_name, reshuffle=False):
-            feed_dict[self.dropout_placeholder] = 0
-            step_prediction = self.sess.run(self.predictions,
-                                            feed_dict=feed_dict)
-            # each true has shape [batch_size, max_num_step, num_classes]
-            # we take the maximum value per time step, which will give us 1
-            # if the (only) exercise was solved correctly or 0 if not.
-            true.append(numpy.amax(feed_dict[self.labels_placeholder], axis=2))
-            # each prediction has shape [batch_size, max_num_step]
-            predictions.append(step_prediction)
-            lengths += feed_dict[self.lengths_placeholder]
-        predictions = numpy.hstack(predictions)
-        true = numpy.hstack(true)
-        assert predictions.shape[0] == self.batch_size
-        assert predictions.shape == true.shape
-        assert predictions.shape[1] >= lengths.max()
-
-        short_predictions = []
-        short_true = []
-        for index, length in enumerate(lengths):
-            short_predictions.append(predictions[index, :int(length)])
-            short_true.append(true[index, :int(length)])
-        return short_true, short_predictions
+    def _get_step_predictions(self, batch_prediction, batch_true, feed_dict):
+        step_prediction = self.sess.run(self.predictions, feed_dict=feed_dict)
+        labels = numpy.argmax(feed_dict[self.labels_placeholder], axis=-1)
+        for index, length in enumerate(feed_dict[self.lengths_placeholder]):
+            batch_prediction[index] = numpy.append(
+                batch_prediction[index], step_prediction[index, :length])
+            batch_true[index] = numpy.append(
+                batch_true[index], labels[index, :length])
 
     def predict(self, partition_name, limit=-1):
         """Applies the classifier to all elements in partition name.
@@ -100,15 +81,20 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
         """
         predictions = []
         true = []
-        self.dataset.reset_batch(partition_name)
+        old_start = self.dataset.reset_batch(partition_name)
         with self.graph.as_default():
             while (self.dataset.has_next_batch(self.batch_size, partition_name)
                    and (limit <= 0 or len(predictions) < limit)):
-                batch_true, batch_prediction = self._get_batch_prediction(
-                    partition_name)
+                batch_prediction = [numpy.array([]) for
+                                    _ in range(self.batch_size)]
+                batch_true = [numpy.array([]) for _ in range(self.batch_size)]
+                for feed_dict in self._fill_feed_dict(partition_name,
+                                                      reshuffle=False):
+                    self._get_step_predictions(batch_prediction, batch_true,
+                                               feed_dict)
                 predictions.extend(batch_prediction)
                 true.extend(batch_true)
-
+        self.dataset.reset_batch(partition_name, old_start)
         return numpy.array(true), numpy.array(predictions)
 
     def _build_evaluation(self, predictions):
