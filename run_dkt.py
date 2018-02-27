@@ -9,7 +9,7 @@ from quick_experiment import dataset
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--logs_dirname', type=str, default=None,
+    parser.add_argument('--base_logs_dirname', type=str, default=None,
                         help='Path to directory to store tensorboard info')
     parser.add_argument('--filename', type=str,
                         help='The path to the pickled file with the processed'
@@ -55,7 +55,6 @@ def read_configuration(args):
     config = {
         'hidden_layer_size': args.hidden_layer_size,
         'batch_size': args.batch_size,
-        'logs_dirname': args.logs_dirname,
         'log_values': args.log_values,
         'max_num_steps': args.max_num_steps,
         'learning_rate': args.learning_rate,

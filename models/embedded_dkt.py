@@ -252,6 +252,18 @@ class EmbeddedSeqGRUModel(EmbeddedSeqLSTMModel):
     def _build_rnn_cell(self):
         return tf.contrib.rnn.GRUCell(self.hidden_layer_size)
 
+    def _build_state_variables(self, cell):
+        # Get the initial state and make a variable out of it
+        # to enable updating its value.
+        state = cell.zero_state(self.batch_size, tf.float32)
+        return tf.Variable(state, trainable=False)
+
+    @staticmethod
+    def _get_state_update_op(state_variables, new_state):
+        # Add an operation to update the train states with the last state
+        # Assign the new state to the state variables on this layer
+        return state_variables.assign(new_state)
+
 
 class EmbeddedBasicLSTMCell(tf.contrib.rnn.BasicLSTMCell):
     """BasicLSTMCell to transform the input before running the cell."""
@@ -338,7 +350,7 @@ class EmbeddedBasicGRUCell(tf.contrib.rnn.GRUCell):
         return super(EmbeddedBasicGRUCell, self).call(inputs, state)
 
 
-class CoEmbeddedSeqGRUModel(CoEmbeddedSeqLSTMModel):
+class CoEmbeddedSeqGRUModel(EmbeddedSeqGRUModel, CoEmbeddedSeqLSTMModel):
     """A Recurrent Neural Network model with GRU cells.
 
     Predicts the probability of the next element on the sequence. The
@@ -366,7 +378,7 @@ class EmbeddedBasicRNNCell(tf.contrib.rnn.BasicRNNCell):
         return super(EmbeddedBasicRNNCell, self).call(inputs, state)
 
 
-class CoEmbeddedSeqRNNModel(CoEmbeddedSeqLSTMModel):
+class CoEmbeddedSeqRNNModel(EmbeddedSeqGRUModel, CoEmbeddedSeqLSTMModel):
     """A Recurrent Neural Network model with LSTM cells.
 
     Predicts the probability of the next element on the sequence. The

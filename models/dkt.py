@@ -111,16 +111,15 @@ class DktLSTMModel(seq_lstm.SeqLSTMModel):
 
         return numpy.array(true), numpy.array(predictions)
 
-    def _build_evaluation(self, logits):
+    def _build_evaluation(self, predictions):
         """Evaluate the quality of the logits at predicting the label.
 
         Args:
-            logits: Logits tensor, float - [batch_size, max_num_steps,
-                feature_vector + 1].
+            predictions: Predictions tensor, int - [current_batch_size,
+                max_num_steps].
         Returns:
             A scalar float32 tensor with the mean squared error.
         """
-        predictions = self._build_predictions(logits)
         # predictions has shape [batch_size, max_num_steps]
         with tf.name_scope('evaluation_performance'):
             mask = tf.sequence_mask(
