@@ -387,7 +387,7 @@ class CoEmbeddedSeqLSTMModel4(CoEmbeddedSeqLSTMModel):
     def _build_rnn_cell(self):
         # We define a new variable for the standard deviation of the normal
         # distribution
-        dist = tf.distributions.Normal(loc=0.0, scale=2.0)
+        dist = tf.distributions.Normal(loc=0.0, scale=1)
 
         def modifier_function(input, state):
             return dist.prob(tf.subtract(input, state))
