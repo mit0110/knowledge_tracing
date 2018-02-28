@@ -3,8 +3,8 @@ import numpy
 import tensorflow as tf
 
 from tensorflow.contrib.tensorboard.plugins import projector
-from tensorflow.python.ops.math_ops import tanh
 from quick_experiment.models import seq_lstm
+from quick_experiment.models import bi_lstm
 
 
 class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
@@ -453,3 +453,21 @@ class CoEmbeddedSeqRNNModel(EmbeddedSeqGRUModel, CoEmbeddedSeqLSTMModel):
 
     def _build_rnn_cell(self):
         return EmbeddedBasicRNNCell(self.hidden_layer_size)
+
+
+class EmbeddedBiLSTMModel(EmbeddedSeqLSTMModel, bi_lstm.BiLSTMModel):
+    pass
+
+
+class CoEmbeddedBiLSTMModel(CoEmbeddedSeqLSTMModel, bi_lstm.BiLSTMModel):
+    def _build_rnn_cell(self):
+        dist = tf.distributions.Normal(loc=0.0, scale=1.0)
+
+        def modifier_function(input, state):
+            return dist.prob(tf.subtract(input, state))
+
+        return (
+            EmbeddedBasicLSTMCell(self.hidden_layer_size,
+                                  modifier_function=modifier_function),
+            tf.contrib.rnn.BasicLSTMCell(self.hidden_layer_size)
+        )

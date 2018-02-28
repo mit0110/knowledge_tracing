@@ -71,7 +71,7 @@ def main():
     experiment_config, partitions = read_configuration(args)
     print('Creating samples')
     assistment_dataset.create_samples(
-        sequences, labels, partition_sizes=partitions, samples_num=1,
+        sequences, labels, partition_sizes=partitions, samples_num=args.runs,
         sort_by_length=True)
 
     assistment_dataset.set_current_sample(0)
