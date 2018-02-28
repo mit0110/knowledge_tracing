@@ -4,7 +4,6 @@ import tensorflow as tf
 
 from tensorflow.contrib.tensorboard.plugins import projector
 from quick_experiment.models import seq_lstm
-from quick_experiment.models import bi_lstm
 
 
 class EmbeddedSeqLSTMModel(seq_lstm.SeqLSTMModel):
@@ -455,11 +454,11 @@ class CoEmbeddedSeqRNNModel(EmbeddedSeqGRUModel, CoEmbeddedSeqLSTMModel):
         return EmbeddedBasicRNNCell(self.hidden_layer_size)
 
 
-class EmbeddedBiLSTMModel(EmbeddedSeqLSTMModel, bi_lstm.BiLSTMModel):
+class EmbeddedBiLSTMModel(EmbeddedSeqLSTMModel, seq_lstm.SeqBiLSTMModel):
     pass
 
 
-class CoEmbeddedBiLSTMModel(CoEmbeddedSeqLSTMModel, bi_lstm.BiLSTMModel):
+class CoEmbeddedBiLSTMModel(CoEmbeddedSeqLSTMModel, seq_lstm.SeqBiLSTMModel):
     def _build_rnn_cell(self):
         dist = tf.distributions.Normal(loc=0.0, scale=1.0)
 
