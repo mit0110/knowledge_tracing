@@ -71,6 +71,8 @@ MODELS = {
     'co-norm': embedded_dkt.CoEmbeddedSeqLSTMModel3,
     'co-norm-fixed': embedded_dkt.CoEmbeddedSeqLSTMModel4,
     'co-bi-norm': embedded_dkt.CoEmbeddedBiLSTMModel,
+    'co-tanh': embedded_dkt.CoEmbeddedSeqLSTMModel5,
+    'co-sigm': embedded_dkt.CoEmbeddedSeqLSTMModel6,
 }
 
 

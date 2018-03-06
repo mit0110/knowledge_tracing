@@ -386,13 +386,47 @@ class CoEmbeddedSeqLSTMModel4(CoEmbeddedSeqLSTMModel):
     def _build_rnn_cell(self):
         # We define a new variable for the standard deviation of the normal
         # distribution
-        dist = tf.distributions.Normal(loc=0.0, scale=1)
+        dist = tf.distributions.Normal(loc=0.0, scale=1.0)
 
         def modifier_function(input, state):
             return dist.prob(tf.subtract(input, state))
 
         return EmbeddedBasicLSTMCell(
             self.hidden_layer_size, modifier_function=modifier_function)
+
+
+class CoEmbeddedSeqLSTMModel5(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer. The embedding_size will be the
+    same as the hidden layer size.
+    """
+
+    def _build_rnn_cell(self):
+        return EmbeddedBasicLSTMCell(
+            self.hidden_layer_size,
+            modifier_function=lambda i, h: tf.tanh(tf.subtract(i, h)))
+
+
+class CoEmbeddedSeqLSTMModel6(CoEmbeddedSeqLSTMModel):
+    """A Recurrent Neural Network model with LSTM cells.
+
+    Predicts the probability of the next element on the sequence. The
+    input is first passed by an embedding layer to reduce dimensionality.
+
+    The embedded layer is combined with the hidden state of the recurrent
+    network before entering the hidden layer. The embedding_size will be the
+    same as the hidden layer size.
+    """
+
+    def _build_rnn_cell(self):
+        return EmbeddedBasicLSTMCell(
+            self.hidden_layer_size,
+            modifier_function=lambda i, h: tf.sigmoid(tf.subtract(i, h)))
 
 
 class EmbeddedBasicGRUCell(tf.contrib.rnn.GRUCell):
