@@ -17,12 +17,19 @@ def parse_arguments():
                              'included in the dataset')
     parser.add_argument('--replace_with_token', action='store_true',
                         help='Replace filtered out problems with a token.')
+    parser.add_argument('--use_cols', nargs='+', type=str,
+                        help='Use only the given columns in the final result.')
     return parser.parse_args()
 
 
 def main():
     args = parse_arguments()
-    dataset = pandas.read_csv(args.filename)
+    if args.use_cols is not None:
+        if PROBLEM_ID_COLUMN not in args.use_cols:
+            args.use_cols.append(PROBLEM_ID_COLUMN)
+        dataset = pandas.read_csv(args.filename, usecols=args.use_cols)
+    else:
+        dataset = pandas.read_csv(args.filename)
 
     filtered_dataset = dataset.groupby(PROBLEM_ID_COLUMN).filter(
         lambda x: len(x) >= args.min_frequency)
