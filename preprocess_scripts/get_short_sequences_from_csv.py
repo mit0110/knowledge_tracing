@@ -130,12 +130,13 @@ def main():
 
     logging.info('Saving embedding information')
     with open(args.embedding_info, 'w') as embedding_meta_file:
-        embedding_meta_file.write('Skill\tTemplate\n')
+        embedding_meta_file.write(
+            'Skill\tTemplate\tProblemType\tAssistmentId\n')
         for value in problem_encoder.values:
             value_df = df[df[identifier_column] == value].iloc[0]
-            skill = value_df['new_skill_id']
-            template = value_df['template_id']
-            embedding_meta_file.write('{}\t{}\n'.format(skill, template))
+            embedding_meta_file.write('{}\t{}\t{}\t{}\n'.format(
+                value_df['new_skill_id'], value_df['template_id'],
+                value_df['problem_type'], value_df['assistment_id']))
 
     logging.info('All operations completed')
 
